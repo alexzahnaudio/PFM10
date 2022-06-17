@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="CtkhAc" name="PFM10" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="17"
-              pluginManufacturer="Alex Zahn">
+              pluginManufacturer="Alex Zahn" companyName="Alex Zahn">
   <MAINGROUP id="IySNap" name="PFM10">
     <GROUP id="{A43200F0-3857-9F76-C832-2120F6D8DF76}" name="Source">
       <FILE id="fj3LjQ" name="PluginProcessor.cpp" compile="1" resource="0"
