@@ -9,6 +9,61 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
+
+template<typename T, size_t Size>           // T will be juce::AudioBuffer<float>
+struct Fifo
+{
+    size_t getSize() const noexcept {return Size;}
+    
+    void prepare(int numSamples, int numChannels)
+    {
+        for (auto& buffer : buffers)
+        {
+            buffer.setSize(numChannels,
+                           numSamples,
+                           false,           // clear everything?
+                           true,            // including the extra space?
+                           true);           // avoid reallocating?
+            buffer.clear();
+        }
+    }
+    
+    bool push(const T& t)
+    {
+        auto scopedWrite = abstractFifo.write(1);
+        if (scopedWrite.blockSize1 > 0)
+        {
+            buffers[scopedWrite.startIndex1] = t;
+            return true;
+        }
+        return false;
+    }
+    
+    bool pull(T& t)
+    {
+        auto scopedRead = abstractFifo.read(1);
+        if (scopedRead.blockSize1 > 0)
+        {
+            t = buffers[scopedRead.startIndex1];
+            return true;
+        }
+        return false;
+    }
+    
+    int getNumAvailableForReading() const
+    {
+        return abstractFifo.getNumReady();
+    }
+    
+    int getAvailableSpace() const
+    {
+        return abstractFifo.getFreeSpace();
+    }
+private:
+    juce::AbstractFifo abstractFifo { Size };
+    std::array<T, Size> buffers;
+};
 
 //==============================================================================
 /**
@@ -52,6 +107,9 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    
+    //==============================================================================
+    Fifo<juce::AudioBuffer<float>, 6> audioBufferFifo;
 
 private:
     //==============================================================================
