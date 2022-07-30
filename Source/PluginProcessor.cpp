@@ -94,6 +94,16 @@ void PFM10AudioProcessor::changeProgramName (int index, const juce::String& newN
 void PFM10AudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     audioBufferFifo.prepare(samplesPerBlock, getTotalNumOutputChannels());
+    
+#if USE_TEST_OSCILLATOR
+    juce::dsp::ProcessSpec processSpec;
+    processSpec.maximumBlockSize = samplesPerBlock;
+    processSpec.sampleRate = sampleRate;
+    processSpec.numChannels = getTotalNumOutputChannels();
+    
+    testOscillator.prepare(processSpec);
+    gain.prepare(processSpec);
+#endif
 }
 
 void PFM10AudioProcessor::releaseResources()
@@ -143,7 +153,30 @@ void PFM10AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+#if USE_TEST_OSCILLATOR
+    buffer.clear();
+    
+    juce::dsp::AudioBlock<float> audioBlock { buffer };
+    
+    testOscillator.setFrequency(JUCE_LIVE_CONSTANT(440.0f));
+    gain.setGainDecibels(JUCE_LIVE_CONSTANT(-3.0f));
+    
+    int numSamplesToProcess = buffer.getNumSamples();
+    for (int i = 0; i < numSamplesToProcess; ++i)
+    {
+        float nextOscillatorSample = testOscillator.processSample(0.f);
+        audioBlock.setSample(0, i, nextOscillatorSample);
+        audioBlock.setSample(1, i, nextOscillatorSample);
+    }
+    
+    gain.process( juce::dsp::ProcessContextReplacing<float>(audioBlock) );
+#endif
+    
     audioBufferFifo.push(buffer);
+    
+#if USE_TEST_OSCILLATOR && MUTE_TEST_OSCILLATOR
+    buffer.clear();
+#endif
 }
 
 //==============================================================================
