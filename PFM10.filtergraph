@@ -12,7 +12,7 @@
         <BUS index="0" layout="disabled"/>
       </INPUTS>
       <OUTPUTS>
-        <BUS index="0" layout="L R"/>
+        <BUS index="0" layout="disabled"/>
       </OUTPUTS>
     </LAYOUT>
   </FILTER>
@@ -34,7 +34,7 @@
   <FILTER uid="9" x="0.5" y="0.9">
     <PLUGIN name="Audio Output" descriptiveName="" format="Internal" category="I/O devices"
             manufacturer="JUCE" version="1.0" file="" uniqueId="724248cb"
-            isInstrument="0" fileTime="0" infoUpdateTime="0" numInputs="2"
+            isInstrument="0" fileTime="0" infoUpdateTime="0" numInputs="0"
             numOutputs="0" isShell="0" uid="724248cb"/>
     <STATE>0.</STATE>
     <LAYOUT>
@@ -61,11 +61,11 @@
       </OUTPUTS>
     </LAYOUT>
   </FILTER>
-  <FILTER uid="11" x="0.4974182444061962" y="0.4828767123287671" uiLastX_Normal="582"
-          uiLastY_Normal="319" uiopen_Normal="1">
+  <FILTER uid="11" x="0.4974182444061962" y="0.4828767123287671" uiLastX_Normal="757"
+          uiLastY_Normal="342" uiopen_Normal="1">
     <PLUGIN name="PFM10" format="VST3" category="Fx" manufacturer="Alex Zahn"
             version="1.0.0" file="/Users/alex/Library/Audio/Plug-Ins/VST3/PFM10.vst3"
-            uniqueId="f0a8dd1d" isInstrument="0" fileTime="181ac630bb8" infoUpdateTime="181ac65747c"
+            uniqueId="f0a8dd1d" isInstrument="0" fileTime="181ac630bb8" infoUpdateTime="1824db50a93"
             numInputs="2" numOutputs="2" isShell="0" uid="acf4569f"/>
     <STATE>191.VMjLgXK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9XCLt3hKt3hKt3hKt3hYRUUSTEETIckVwTjQisVTTgkdEYjKAQjYPQSPWgUdMcjKAQjct3hdA4hKt3hKt3hKtnTUv.UQAslXuk0UXoWUFE0YQcEV77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9..</STATE>
     <LAYOUT>
@@ -77,8 +77,6 @@
       </OUTPUTS>
     </LAYOUT>
   </FILTER>
-  <CONNECTION srcFilter="7" srcChannel="0" dstFilter="11" dstChannel="0"/>
-  <CONNECTION srcFilter="7" srcChannel="1" dstFilter="11" dstChannel="1"/>
   <CONNECTION srcFilter="11" srcChannel="0" dstFilter="9" dstChannel="0"/>
   <CONNECTION srcFilter="11" srcChannel="1" dstFilter="9" dstChannel="1"/>
 </FILTERGRAPH>

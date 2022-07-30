@@ -8,6 +8,9 @@
 
 #pragma once
 
+#define USE_TEST_OSCILLATOR false
+#define MUTE_TEST_OSCILLATOR true
+
 #include <JuceHeader.h>
 #include <array>
 
@@ -66,6 +69,7 @@ private:
 };
 
 //==============================================================================
+//==============================================================================
 /**
 */
 class PFM10AudioProcessor  : public juce::AudioProcessor
@@ -114,4 +118,9 @@ public:
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PFM10AudioProcessor)
+    
+#if USE_TEST_OSCILLATOR
+    juce::dsp::Oscillator<float> testOscillator { [](float x) {return std::sin(x);} };
+    juce::dsp::Gain<float> gain;
+#endif
 };
