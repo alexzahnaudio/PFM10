@@ -161,7 +161,14 @@ void PFM10AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     testOscillator.setFrequency(JUCE_LIVE_CONSTANT(440.0f));
     gain.setGainDecibels(JUCE_LIVE_CONSTANT(-3.0f));
     
-    testOscillator.process( juce::dsp::ProcessContextReplacing<float>(audioBlock) );
+    int numSamplesToProcess = buffer.getNumSamples();
+    for (int i = 0; i < numSamplesToProcess; ++i)
+    {
+        float nextOscillatorSample = testOscillator.processSample(0.f);
+        audioBlock.setSample(0, i, nextOscillatorSample);
+        audioBlock.setSample(1, i, nextOscillatorSample);
+    }
+    
     gain.process( juce::dsp::ProcessContextReplacing<float>(audioBlock) );
 #endif
     
