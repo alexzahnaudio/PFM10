@@ -21,8 +21,17 @@ void Meter::paint(juce::Graphics& g)
     rect.setX(0);
     float yMin = bounds.getBottom();
     float yMax = bounds.getY();
+    
     auto dbPeakMapped = juce::jmap(dbPeak, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
+    
+    // TO DO: Limit dbPeakMapped to yMax.
+    //         Currently the meter fill rect will go ABOVE the top of the meter
+    //         if dbPeak is greater than MAX_DECIBELS, resulting in a black bar
+    //         at the bottom of the meter.
+        
     rect.setY(dbPeakMapped);
+    
+    // TO DO: Make the rect color RED instead of orange if dbPeak > MAX_DECIBELS
     
     g.setColour(juce::Colours::orange);
     g.fillRect(rect);
@@ -112,16 +121,20 @@ void DbScale::buildBackgroundImage(int dbDivision,
         int tickInt = static_cast<int>(tick.db);
         std::string tickString = std::to_string(tickInt);
         if(tickInt > 0) tickString.insert(0,"+");
-            
-        bkgdGraphicsContext.drawFittedText(tickString,
-                                           0,
-                                           tick.y,
-                                           30,
-                                           1,
-                                           juce::Justification::centred,
-                                           1);
         
-        DBG(tickString << " at y position " << std::to_string(tick.y));
+        // NOTE: the text shifts downward by (height) pixels, but the text
+        //       disappears if height is set to 0. This is causing the ticks to
+        //       be one pixel below where they should be. Temporary fix is
+        //       to just subtract 1 from (y) to counteract this.
+        bkgdGraphicsContext.drawFittedText(tickString,
+                                           0,                       //x
+                                           tick.y - 1,              //y
+                                           30,                      //width
+                                           1,                       //height
+                                           juce::Justification::centred,
+                                           1);                      //max num lines
+        
+        //DBG(tickString << " at y position " << std::to_string(tick.y));
     }
 }
 
@@ -160,7 +173,7 @@ void PFM10AudioProcessorEditor::resized()
     auto width = bounds.getWidth();
     auto height = bounds.getHeight();
     
-    meter.setTopLeftPosition(bounds.getX(), bounds.getY()+60+JUCE_LIVE_CONSTANT(10));
+    meter.setTopLeftPosition(bounds.getX(), bounds.getY()+60);
     meter.setSize(width/8, height/2);
     
     dbScale.setBounds(meter.getRight(), 0, 30, getHeight());
