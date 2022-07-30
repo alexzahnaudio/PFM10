@@ -9,6 +9,107 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+ValueHolder::ValueHolder()
+{
+    timeOfPeak = juce::Time::currentTimeMillis();
+    startTimerHz(60);
+}
+
+ValueHolder::~ValueHolder()
+{
+    stopTimer();
+}
+
+void ValueHolder::timerCallback()
+{
+    juce::int64 now = juce::Time::currentTimeMillis();
+    juce::int64 elapsed = now - timeOfPeak;
+    
+    if (elapsed > durationToHoldForMs)
+    {
+        isOverThreshold = (currentValue > threshold);
+        heldValue = NEGATIVE_INFINITY;
+    }
+}
+
+void ValueHolder::setThreshold(float th)
+{
+    threshold = th;
+    isOverThreshold = (currentValue > threshold);
+}
+
+void ValueHolder::updateHeldValue(float v)
+{
+    if (v > threshold)
+    {
+        isOverThreshold = true;
+        timeOfPeak = juce::Time::currentTimeMillis();
+        
+        if (v > heldValue)
+        {
+            heldValue = v;
+        }
+    }
+    
+    currentValue = v;
+}
+
+//==============================================================================
+
+TextMeter::TextMeter()
+{
+    valueHolder.setThreshold(0.f);
+    valueHolder.updateHeldValue(NEGATIVE_INFINITY);
+}
+
+void TextMeter::paint(juce::Graphics &g)
+{
+    juce::Colour textColor;
+    float valueToDisplay;
+    
+    if (valueHolder.getIsOverThreshold())
+    {
+        g.fillAll(juce::Colours::red);
+        textColor = juce::Colours::black;
+        
+        valueToDisplay = valueHolder.getHeldValue();
+    }
+    else
+    {
+        g.fillAll(juce::Colours::black);
+        textColor = juce::Colours::white;
+
+        valueToDisplay = valueHolder.getCurrentValue();
+    }
+    
+    juce::String textToDisplay;
+    if (valueToDisplay > NEGATIVE_INFINITY)
+    {
+        textToDisplay = juce::String(valueToDisplay, 1);
+        textToDisplay = textToDisplay.trimEnd();
+    }
+    else
+    {
+        textToDisplay = juce::String("-inf");
+    }
+    
+    g.setColour(textColor);
+    g.setFont(12.f);
+    g.drawFittedText(textToDisplay,
+                     getLocalBounds(),
+                     juce::Justification::centredBottom,
+                     1);
+}
+
+void TextMeter::update(float valueDb)
+{
+    cachedValueDb = valueDb;
+    valueHolder.updateHeldValue(valueDb);
+    repaint();
+}
+
+//==============================================================================
+
 void Meter::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
@@ -42,6 +143,8 @@ void Meter::update(float dbLevel)
     dbPeak = dbLevel;
     repaint();
 }
+
+//==============================================================================
 
 void DbScale::paint(juce::Graphics &g)
 {
@@ -145,6 +248,7 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
 {
     addAndMakeVisible(meter);
     addAndMakeVisible(dbScale);
+    addAndMakeVisible(textMeter);
     
     startTimerHz(60);
     
@@ -161,10 +265,6 @@ void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-
-    g.setColour (juce::Colours::white);
-    g.setFont (15.0f);
-    g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
 }
 
 void PFM10AudioProcessorEditor::resized()
@@ -176,11 +276,22 @@ void PFM10AudioProcessorEditor::resized()
     meter.setTopLeftPosition(bounds.getX(), bounds.getY()+60);
     meter.setSize(width/8, height/2);
     
-    dbScale.setBounds(meter.getRight(), 0, 30, getHeight());
+    dbScale.setBounds(meter.getRight(),
+                      0,
+                      30,
+                      getHeight());
     dbScale.buildBackgroundImage(6, //db division
                                  meter.getBounds(),
                                  NEGATIVE_INFINITY,
                                  MAX_DECIBELS);
+    
+    int textHeight = 12;
+    auto tempFont = juce::Font(textHeight);
+    int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
+    textMeter.setBounds(meter.getX() + meter.getWidth()/2 - textMeterWidth/2,
+                        meter.getY() - (textHeight+2),
+                        textMeterWidth,
+                        textHeight+2);
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -196,5 +307,6 @@ void PFM10AudioProcessorEditor::timerCallback()
         float leftChannelMag = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
         float dbLeftChannelMag = juce::Decibels::gainToDecibels(leftChannelMag, NEGATIVE_INFINITY);
         meter.update(dbLeftChannelMag);
+        textMeter.update(dbLeftChannelMag);
     }
 }

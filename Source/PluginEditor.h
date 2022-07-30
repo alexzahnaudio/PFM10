@@ -21,6 +21,36 @@
 #endif
 #define NEGATIVE_INFINITY -66.f
 
+struct ValueHolder : juce::Timer
+{
+    ValueHolder();
+    ~ValueHolder() override;
+    void timerCallback() override;
+    void setThreshold(float th);
+    void updateHeldValue(float v);
+    void setHoldDuration(int ms) { durationToHoldForMs = ms; }
+    float getCurrentValue() const { return currentValue; }
+    float getHeldValue() const { return heldValue; }
+    bool getIsOverThreshold() const { return isOverThreshold; }
+private:
+    float threshold = 0;
+    float currentValue = NEGATIVE_INFINITY;
+    float heldValue = NEGATIVE_INFINITY;
+    juce::int64 timeOfPeak;
+    int durationToHoldForMs { 500 };
+    bool isOverThreshold { false };
+};
+
+struct TextMeter : juce::Component
+{
+    TextMeter();
+    void paint(juce::Graphics& g) override;
+    void update(float valueDb);
+private:
+    float cachedValueDb;
+    ValueHolder valueHolder;
+};
+
 struct Meter : juce::Component
 {
     void paint (juce::Graphics&) override;
@@ -66,6 +96,7 @@ private:
     PFM10AudioProcessor& audioProcessor;
     
     juce::AudioBuffer<float> editorAudioBuffer;
+    TextMeter textMeter;
     Meter meter;
     DbScale dbScale;
 
