@@ -21,6 +21,26 @@
 #endif
 #define NEGATIVE_INFINITY -66.f
 
+struct DecayingValueHolder : juce::Timer
+{
+    DecayingValueHolder();
+    void updateHeldValue(float input);
+    float getHeldValue() const { return heldValue; }
+    bool isOverThreshold() const;
+    void setHoldTime(int ms);
+    void setDecayRate(float dbPerSec);
+    void timerCallback() override;
+private:
+    float heldValue { NEGATIVE_INFINITY };
+    juce::int64 peakTime = getNow();
+    float threshold = 0.f;
+    juce::int64 holdTime = 2000; //2 seconds
+    float decayRatePerFrame { 0 };
+    float decayRateMultiplier { 1 };
+    static juce::int64 getNow();
+    void resetDecayRateMultiplier() { decayRateMultiplier = 1; }
+};
+
 struct ValueHolder : juce::Timer
 {
     ValueHolder();
@@ -57,6 +77,7 @@ struct Meter : juce::Component
     void update(float dbLevel);
 private:
     float dbPeak { NEGATIVE_INFINITY };
+    DecayingValueHolder decayingValueHolder;
 };
 
 struct Tick

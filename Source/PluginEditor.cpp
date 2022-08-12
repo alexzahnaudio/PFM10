@@ -9,6 +9,68 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+DecayingValueHolder::DecayingValueHolder()
+{
+    // default starting decay rate 0.1 db/frame
+    decayRatePerFrame = 0.1f;
+    
+    startTimerHz(60);
+}
+
+void DecayingValueHolder::updateHeldValue(float input)
+{
+    if (input > heldValue)
+    {
+        peakTime = getNow();
+        heldValue = input;
+        decayRateMultiplier = 1;
+    }
+}
+
+bool DecayingValueHolder::isOverThreshold() const
+{
+    return (heldValue > threshold);
+}
+
+void DecayingValueHolder::setHoldTime(int ms)
+{
+    holdTime = ms;
+}
+
+void DecayingValueHolder::setDecayRate(float dbPerSec)
+{
+    // note: getTimerInterval() returns milliseconds
+    decayRatePerFrame = dbPerSec * (getTimerInterval() / 1000);
+}
+
+void DecayingValueHolder::timerCallback()
+{
+    juce::int64 now = getNow();
+    
+    if ((now - peakTime) > holdTime)
+    {
+        heldValue -= decayRatePerFrame * decayRateMultiplier;
+        
+        heldValue = juce::jlimit(NEGATIVE_INFINITY,
+                                 MAX_DECIBELS,
+                                 heldValue);
+        
+        decayRateMultiplier += 2;
+        
+        if (heldValue <= NEGATIVE_INFINITY)
+        {
+            resetDecayRateMultiplier();
+        }
+    }
+}
+
+juce::int64 DecayingValueHolder::getNow()
+{
+    return juce::Time::currentTimeMillis();
+}
+
+//==============================================================================
+
 ValueHolder::ValueHolder()
 {
     timeOfPeak = juce::Time::currentTimeMillis();
@@ -114,33 +176,39 @@ void Meter::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
     
-    auto bounds = getLocalBounds();
-    
-    juce::Rectangle<float> rect;
-    rect.setBottom(bounds.getBottom());
-    rect.setWidth(bounds.getWidth());
-    rect.setX(0);
-    float yMin = bounds.getBottom();
-    float yMax = bounds.getY();
+    juce::Rectangle<float> meterFillRect(getLocalBounds().toFloat());
+    float yMin = meterFillRect.getBottom();
+    float yMax = meterFillRect.getY();
     
     auto dbPeakMapped = juce::jmap(dbPeak, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
+    dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
+    meterFillRect.setY(dbPeakMapped);
     
-    // TO DO: Limit dbPeakMapped to yMax.
-    //         Currently the meter fill rect will go ABOVE the top of the meter
-    //         if dbPeak is greater than MAX_DECIBELS, resulting in a black bar
-    //         at the bottom of the meter.
-        
-    rect.setY(dbPeakMapped);
-    
-    // TO DO: Make the rect color RED instead of orange if dbPeak > MAX_DECIBELS
-    
+    // TO DO: gradated color change on meter e.g. Red above 0db
     g.setColour(juce::Colours::orange);
-    g.fillRect(rect);
+    g.fillRect(meterFillRect);
+    
+    // Decaying Peak Level Tick Mark
+    juce::Rectangle<float> peakLevelTickMark(meterFillRect);
+    
+    auto peakLevelTickYMapped = juce::jmap(decayingValueHolder.getHeldValue(),
+                                           NEGATIVE_INFINITY,
+                                           MAX_DECIBELS,
+                                           yMin,
+                                           yMax);
+    //peakLevelTickYMapped = juce::jmax(peakLevelTickYMapped, yMax);
+    peakLevelTickYMapped = juce::jlimit(yMax, meterFillRect.getY(), peakLevelTickYMapped);
+    peakLevelTickMark.setY(peakLevelTickYMapped);
+    peakLevelTickMark.setBottom( peakLevelTickMark.getY() + 2 );
+    
+    g.setColour(juce::Colours::white);
+    g.fillRect(peakLevelTickMark);
 }
 
 void Meter::update(float dbLevel)
 {
     dbPeak = dbLevel;
+    decayingValueHolder.updateHeldValue(dbPeak);
     repaint();
 }
 
@@ -273,7 +341,7 @@ void PFM10AudioProcessorEditor::resized()
     auto width = bounds.getWidth();
     auto height = bounds.getHeight();
     
-    meter.setTopLeftPosition(bounds.getX(), bounds.getY()+60);
+    meter.setTopLeftPosition(bounds.getX()+JUCE_LIVE_CONSTANT(0), bounds.getY()+60);
     meter.setSize(width/8, height/2);
     
     dbScale.setBounds(meter.getRight(),
