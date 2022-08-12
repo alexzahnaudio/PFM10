@@ -9,6 +9,68 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+DecayingValueHolder::DecayingValueHolder()
+{
+    // default starting decay rate 0.1 db/frame
+    decayRatePerFrame = 0.1f;
+    
+    startTimerHz(60);
+}
+
+void DecayingValueHolder::updateHeldValue(float input)
+{
+    if (input > heldValue)
+    {
+        peakTime = getNow();
+        heldValue = input;
+        decayRateMultiplier = 1;
+    }
+}
+
+bool DecayingValueHolder::isOverThreshold() const
+{
+    return (heldValue > threshold);
+}
+
+void DecayingValueHolder::setHoldTime(int ms)
+{
+    holdTime = ms;
+}
+
+void DecayingValueHolder::setDecayRate(float dbPerSec)
+{
+    // note: getTimerInterval() returns milliseconds
+    decayRatePerFrame = dbPerSec * (getTimerInterval() / 1000);
+}
+
+void DecayingValueHolder::timerCallback()
+{
+    juce::int64 now = getNow();
+    
+    if ((now - peakTime) > holdTime)
+    {
+        heldValue -= decayRatePerFrame * decayRateMultiplier;
+        
+        heldValue = juce::jlimit(NEGATIVE_INFINITY,
+                                 MAX_DECIBELS,
+                                 heldValue);
+        
+        decayRateMultiplier += 2;
+        
+        if (heldValue <= NEGATIVE_INFINITY)
+        {
+            resetDecayRateMultiplier();
+        }
+    }
+}
+
+juce::int64 DecayingValueHolder::getNow()
+{
+    return juce::Time::currentTimeMillis();
+}
+
+//==============================================================================
+
 ValueHolder::ValueHolder()
 {
     timeOfPeak = juce::Time::currentTimeMillis();
@@ -126,14 +188,27 @@ void Meter::paint(juce::Graphics& g)
     g.setColour(juce::Colours::orange);
     g.fillRect(meterFillRect);
     
+    // Decaying Peak Level Tick Mark
+    juce::Rectangle<float> peakLevelTickMark(meterFillRect);
     
-    g.setColour(juce::Colours::orange);
-    g.fillRect(rect);
+    auto peakLevelTickYMapped = juce::jmap(decayingValueHolder.getHeldValue(),
+                                           NEGATIVE_INFINITY,
+                                           MAX_DECIBELS,
+                                           yMin,
+                                           yMax);
+    //peakLevelTickYMapped = juce::jmax(peakLevelTickYMapped, yMax);
+    peakLevelTickYMapped = juce::jlimit(yMax, meterFillRect.getY(), peakLevelTickYMapped);
+    peakLevelTickMark.setY(peakLevelTickYMapped);
+    peakLevelTickMark.setBottom( peakLevelTickMark.getY() + 2 );
+    
+    g.setColour(juce::Colours::white);
+    g.fillRect(peakLevelTickMark);
 }
 
 void Meter::update(float dbLevel)
 {
     dbPeak = dbLevel;
+    decayingValueHolder.updateHeldValue(dbPeak);
     repaint();
 }
 
