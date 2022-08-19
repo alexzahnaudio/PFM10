@@ -9,6 +9,58 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+template<typename T>
+Averager<T>::Averager(size_t numElements, T initialValue)
+{
+    resize(numElements, initialValue);
+}
+
+template<typename T>
+void Averager<T>::resize(size_t numElements, T initialValue)
+{
+    elements.resize(numElements);
+    clear(initialValue);
+}
+
+template<typename T>
+void Averager<T>::clear(T initialValue)
+{
+    for (T element : elements)
+    {
+        element = initialValue;
+    }
+    
+    writeIndex = 0;
+    
+    //update average
+    //update sum
+}
+
+template<typename T>
+void Averager<T>::add(T t)
+{
+    // First, cache the atomics as local variables to work with
+    auto writeIndexTemp = writeIndex.load();
+    auto sumTemp = sum.load();
+    
+    sumTemp -= elements[writeIndexTemp];
+    sumTemp += t;
+    
+    elements[writeIndexTemp] = t;
+    
+    ++writeIndexTemp;
+    if (writeIndexTemp > (elements.size() - 1))
+    {
+        writeIndexTemp = 0;
+    }
+    
+    writeIndex = writeIndexTemp;
+    sum = sumTemp;
+    avg = sumTemp / elements.size();
+}
+
+//==============================================================================
+
 DecayingValueHolder::DecayingValueHolder()
 {
     // default starting decay rate 0.1 db/frame
@@ -214,6 +266,52 @@ void Meter::update(float dbLevel)
 
 //==============================================================================
 
+MacroMeter::MacroMeter()
+: averager(60, 0)
+{
+    addAndMakeVisible(peakTextMeter);
+    addAndMakeVisible(peakMeter);
+    addAndMakeVisible(averageMeter);
+}
+
+void MacroMeter::paint(juce::Graphics &g)
+{
+}
+
+void MacroMeter::resized()
+{
+    auto bounds = getLocalBounds();
+    auto width = bounds.getWidth();
+    auto height = bounds.getHeight();
+    
+    peakMeter.setTopLeftPosition(bounds.getX(), bounds.getY()+60);
+    peakMeter.setSize(width/8, height/2);
+    
+    averageMeter.setTopLeftPosition(bounds.getX()+width/2, bounds.getY()+60);
+    averageMeter.setSize(width/8, height/2);
+    
+    int textHeight = 12;
+    auto tempFont = juce::Font(textHeight);
+    int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
+    peakTextMeter.setBounds(peakMeter.getX() + peakMeter.getWidth()/2 - textMeterWidth/2,
+                        peakMeter.getY() - (textHeight+2),
+                        textMeterWidth,
+                        textHeight+2);
+    
+    
+}
+
+void MacroMeter::updateLevel(float level)
+{
+    peakTextMeter.update(level);
+    peakMeter.update(level);
+    
+    averager.add(level);
+    averageMeter.update(averager.getAvg());
+}
+
+//==============================================================================
+
 void DbScale::paint(juce::Graphics &g)
 {
     g.drawImage(bkgd, getLocalBounds().toFloat());
@@ -318,17 +416,17 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     addAndMakeVisible(dbScale);
     addAndMakeVisible(textMeter);
     
-    startTimerHz(60);
+    addAndMakeVisible(macroMeter);
+    
+    startTimerHz(refreshRateHz);
     
     setSize (600, 450);
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
 {
-    
 }
 
-//==============================================================================
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
@@ -360,6 +458,9 @@ void PFM10AudioProcessorEditor::resized()
                         meter.getY() - (textHeight+2),
                         textMeterWidth,
                         textHeight+2);
+    
+    macroMeter.setTopLeftPosition(width/2, height/2);
+    macroMeter.setSize(width/2, height/2);
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -376,5 +477,12 @@ void PFM10AudioProcessorEditor::timerCallback()
         float dbLeftChannelMag = juce::Decibels::gainToDecibels(leftChannelMag, NEGATIVE_INFINITY);
         meter.update(dbLeftChannelMag);
         textMeter.update(dbLeftChannelMag);
+        
+        macroMeter.updateLevel(dbLeftChannelMag);
     }
+}
+
+int PFM10AudioProcessorEditor::getRefreshRateHz() const
+{
+    return refreshRateHz;
 }

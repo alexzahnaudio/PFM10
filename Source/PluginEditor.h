@@ -21,6 +21,27 @@
 #endif
 #define NEGATIVE_INFINITY -66.f
 
+template<typename T>
+struct Averager
+{
+    Averager(size_t numElements, T initialValue);
+    
+    void resize(size_t numElements, T initialValue);
+    
+    void clear(T initialValue);
+    
+    size_t getSize() const { return elements.size(); }
+    
+    void add(T t);
+    
+    float getAvg() const { return avg; }
+private:
+    std::vector<T> elements;
+    std::atomic<float> avg { static_cast<float>(T()) };
+    std::atomic<size_t> writeIndex = 0;
+    std::atomic<T> sum { 0 };
+};
+
 struct DecayingValueHolder : juce::Timer
 {
     DecayingValueHolder();
@@ -80,6 +101,19 @@ private:
     DecayingValueHolder decayingValueHolder;
 };
 
+struct MacroMeter : juce::Component
+{
+    MacroMeter();
+    void paint(juce::Graphics&) override;
+    void resized() override;
+    void updateLevel(float level);
+private:
+    TextMeter peakTextMeter;
+    Meter peakMeter;
+    Meter averageMeter;
+    Averager<float> averager;
+};
+
 struct Tick
 {
     float db { 0.f };
@@ -110,6 +144,7 @@ public:
     void resized() override;
     //==============================================================================
     void timerCallback() override;
+    int getRefreshRateHz() const;
 
 private:
     // This reference is provided as a quick way for your editor to
@@ -120,6 +155,10 @@ private:
     TextMeter textMeter;
     Meter meter;
     DbScale dbScale;
+    
+    MacroMeter macroMeter;
 
+    int refreshRateHz { 60 };
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PFM10AudioProcessorEditor)
 };
