@@ -107,7 +107,9 @@ struct MacroMeter : juce::Component
     void paint(juce::Graphics&) override;
     void resized() override;
     void updateLevel(float level);
+    int getTextHeight() const;
 private:
+    int textHeight {12};
     TextMeter peakTextMeter;
     Meter peakMeter;
     Meter averageMeter;
@@ -128,6 +130,18 @@ struct DbScale : juce::Component
     static std::vector<Tick> getTicks(int dbDivision, juce::Rectangle<int> meterBounds, int minDb, int maxDb);
 private:
     juce::Image bkgd;
+};
+
+struct StereoMeter : juce::Component
+{
+    StereoMeter(juce::String meterName);
+    void resized() override;
+    void update(float leftChannelDb, float rightChannelDb);
+private:
+    MacroMeter leftMacroMeter;
+    MacroMeter rightMacroMeter;
+    DbScale dbScale;
+    juce::Label label;
 };
 
 //==============================================================================
@@ -152,11 +166,8 @@ private:
     PFM10AudioProcessor& audioProcessor;
     
     juce::AudioBuffer<float> editorAudioBuffer;
-    TextMeter textMeter;
-    Meter meter;
-    DbScale dbScale;
     
-    MacroMeter macroMeter;
+    StereoMeter peakStereoMeter;
 
     int refreshRateHz { 60 };
     

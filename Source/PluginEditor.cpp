@@ -284,21 +284,23 @@ void MacroMeter::resized()
     auto width = bounds.getWidth();
     auto height = bounds.getHeight();
     
-    peakMeter.setTopLeftPosition(bounds.getX(), bounds.getY()+60);
-    peakMeter.setSize(width/8, height/2);
-    
-    averageMeter.setTopLeftPosition(bounds.getX()+width/2, bounds.getY()+60);
-    averageMeter.setSize(width/8, height/2);
-    
-    int textHeight = 12;
     auto tempFont = juce::Font(textHeight);
+    
+    int peakMeterWidth = 8;
+    int averageMeterWidth = width - peakMeterWidth;
+    int headerHeight = 0;
+    
+    peakMeter.setTopLeftPosition(bounds.getX(), bounds.getY()+textHeight+headerHeight);
+    peakMeter.setSize(peakMeterWidth, height-textHeight-headerHeight);
+    
+    averageMeter.setTopLeftPosition(peakMeter.getRight()+2, peakMeter.getY());
+    averageMeter.setSize(averageMeterWidth, peakMeter.getHeight());
+    
     int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
-    peakTextMeter.setBounds(peakMeter.getX() + peakMeter.getWidth()/2 - textMeterWidth/2,
-                        peakMeter.getY() - (textHeight+2),
-                        textMeterWidth,
-                        textHeight+2);
-    
-    
+    peakTextMeter.setBounds(averageMeter.getX() + averageMeter.getWidth()/2 - textMeterWidth/2,
+                            averageMeter.getY() - (textHeight+2),
+                            textMeterWidth,
+                            textHeight+2);
 }
 
 void MacroMeter::updateLevel(float level)
@@ -308,6 +310,11 @@ void MacroMeter::updateLevel(float level)
     
     averager.add(level);
     averageMeter.update(averager.getAvg());
+}
+
+int MacroMeter::getTextHeight() const
+{
+    return textHeight;
 }
 
 //==============================================================================
@@ -408,19 +415,64 @@ void DbScale::buildBackgroundImage(int dbDivision,
 }
 
 //==============================================================================
+
+StereoMeter::StereoMeter(juce::String meterName)
+{
+    addAndMakeVisible(leftMacroMeter);
+    addAndMakeVisible(rightMacroMeter);
+    addAndMakeVisible(dbScale);
+    addAndMakeVisible(label);
+
+    label.setText("L  " + meterName + "  R", juce::dontSendNotification);
+}
+
+void StereoMeter::resized()
+{
+    auto bounds = getLocalBounds();
+    auto height = bounds.getHeight();
+    int macroMeterWidth = 40;
+    int macroMeterHeight = height-200;
+    
+    leftMacroMeter.setTopLeftPosition(0, 0);
+    leftMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
+    
+    dbScale.setBounds(leftMacroMeter.getRight(),
+                      leftMacroMeter.getY(),
+                      30,
+                      leftMacroMeter.getHeight()+50);
+    dbScale.buildBackgroundImage(6, //db division
+                                 leftMacroMeter.getBounds().withTrimmedTop(leftMacroMeter.getTextHeight()),
+                                 NEGATIVE_INFINITY,
+                                 MAX_DECIBELS);
+    
+    rightMacroMeter.setTopLeftPosition(leftMacroMeter.getRight()+dbScale.getWidth(), 0);
+    rightMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
+    
+    label.setBounds(leftMacroMeter.getX(),
+                    leftMacroMeter.getBottom()+10,
+                    rightMacroMeter.getRight()-leftMacroMeter.getX(),
+                    50);
+    label.setJustificationType(juce::Justification(12)); // top-centered
+}
+
+void StereoMeter::update(float leftChannelDb, float rightChannelDb)
+{
+    leftMacroMeter.updateLevel(leftChannelDb);
+    rightMacroMeter.updateLevel(rightChannelDb);
+}
+
+//==============================================================================
 //==============================================================================
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
+    : AudioProcessorEditor (&p),
+      audioProcessor (p),
+      peakStereoMeter(juce::String("Peak"))
 {
-    addAndMakeVisible(meter);
-    addAndMakeVisible(dbScale);
-    addAndMakeVisible(textMeter);
-    
-    addAndMakeVisible(macroMeter);
+    addAndMakeVisible(peakStereoMeter);
     
     startTimerHz(refreshRateHz);
     
-    setSize (600, 450);
+    setSize (800, 600);
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
@@ -438,29 +490,33 @@ void PFM10AudioProcessorEditor::resized()
     auto bounds = getLocalBounds();
     auto width = bounds.getWidth();
     auto height = bounds.getHeight();
+
+    peakStereoMeter.setTopLeftPosition(0, 0);
+    peakStereoMeter.setSize(width, height);
     
-    meter.setTopLeftPosition(bounds.getX()+JUCE_LIVE_CONSTANT(0), bounds.getY()+60);
-    meter.setSize(width/8, height/2);
-    
-    dbScale.setBounds(meter.getRight(),
-                      0,
-                      30,
-                      getHeight());
-    dbScale.buildBackgroundImage(6, //db division
-                                 meter.getBounds(),
-                                 NEGATIVE_INFINITY,
-                                 MAX_DECIBELS);
-    
-    int textHeight = 12;
-    auto tempFont = juce::Font(textHeight);
-    int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
-    textMeter.setBounds(meter.getX() + meter.getWidth()/2 - textMeterWidth/2,
-                        meter.getY() - (textHeight+2),
-                        textMeterWidth,
-                        textHeight+2);
-    
-    macroMeter.setTopLeftPosition(width/2, height/2);
-    macroMeter.setSize(width/2, height/2);
+//
+//    meter.setTopLeftPosition(bounds.getX()+JUCE_LIVE_CONSTANT(0), bounds.getY()+60);
+//    meter.setSize(width/8, height/2);
+//
+//    dbScale.setBounds(meter.getRight(),
+//                      0,
+//                      30,
+//                      getHeight());
+//    dbScale.buildBackgroundImage(6, //db division
+//                                 meter.getBounds(),
+//                                 NEGATIVE_INFINITY,
+//                                 MAX_DECIBELS);
+//
+//    int textHeight = 12;
+//    auto tempFont = juce::Font(textHeight);
+//    int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
+//    textMeter.setBounds(meter.getX() + meter.getWidth()/2 - textMeterWidth/2,
+//                        meter.getY() - (textHeight+2),
+//                        textMeterWidth,
+//                        textHeight+2);
+//
+
+
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -475,10 +531,12 @@ void PFM10AudioProcessorEditor::timerCallback()
         // get the left channel's peak magnitude within the editor audio buffer
         float leftChannelMag = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
         float dbLeftChannelMag = juce::Decibels::gainToDecibels(leftChannelMag, NEGATIVE_INFINITY);
-        meter.update(dbLeftChannelMag);
-        textMeter.update(dbLeftChannelMag);
         
-        macroMeter.updateLevel(dbLeftChannelMag);
+        // get the right channel's peak magnitude within the editor audio buffer
+        float rightChannelMag = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
+        float dbRightChannelMag = juce::Decibels::gainToDecibels(rightChannelMag, NEGATIVE_INFINITY);
+        
+        peakStereoMeter.update(dbLeftChannelMag, dbRightChannelMag);
     }
 }
 

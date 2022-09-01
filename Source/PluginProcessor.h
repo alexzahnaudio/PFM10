@@ -8,7 +8,7 @@
 
 #pragma once
 
-#define USE_TEST_OSCILLATOR true
+#define USE_TEST_OSCILLATOR false
 #define MUTE_TEST_OSCILLATOR true
 
 #include <JuceHeader.h>
