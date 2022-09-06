@@ -274,9 +274,9 @@ MacroMeter::MacroMeter()
     addAndMakeVisible(averageMeter);
 }
 
-void MacroMeter::paint(juce::Graphics &g)
-{
-}
+//void MacroMeter::paint(juce::Graphics &g)
+//{
+//}
 
 void MacroMeter::resized()
 {
@@ -431,7 +431,7 @@ void StereoMeter::resized()
     auto bounds = getLocalBounds();
     auto height = bounds.getHeight();
     int macroMeterWidth = 40;
-    int macroMeterHeight = height-200;
+    int macroMeterHeight = height-30;
     
     leftMacroMeter.setTopLeftPosition(0, 0);
     leftMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
@@ -462,13 +462,175 @@ void StereoMeter::update(float leftChannelDb, float rightChannelDb)
 }
 
 //==============================================================================
+
+template<typename T>
+ReadAllAfterWriteCircularBuffer<T>::ReadAllAfterWriteCircularBuffer(T fillValue)
+{
+    resize(1, fillValue);
+}
+
+template<typename T>
+void ReadAllAfterWriteCircularBuffer<T>::resize(std::size_t s, T fillValue)
+{
+    data.assign(s, fillValue);
+    
+    resetWriteIndex();
+}
+
+template<typename T>
+void ReadAllAfterWriteCircularBuffer<T>::clear(T fillValue)
+{
+    data.assign(getSize(), fillValue);
+    
+    resetWriteIndex();
+}
+
+template<typename T>
+void ReadAllAfterWriteCircularBuffer<T>::write(T t)
+{
+    size_t writeIndexCached = writeIndex;
+    size_t sizeCached = getSize();
+    
+    data[writeIndexCached] = t;
+    
+    writeIndexCached = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+    
+    writeIndex = writeIndexCached;
+}
+
+template<typename T>
+std::vector<T>& ReadAllAfterWriteCircularBuffer<T>::getData()
+{
+    return data;
+}
+
+template<typename T>
+size_t ReadAllAfterWriteCircularBuffer<T>::getReadIndex() const
+{
+    size_t writeIndexCached = writeIndex;
+    size_t sizeCached = getSize();
+    
+    size_t readIndex = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+        
+    return readIndex;
+}
+
+template<typename T>
+size_t ReadAllAfterWriteCircularBuffer<T>::getSize() const
+{
+    return data.size();
+}
+
+template<typename T>
+void ReadAllAfterWriteCircularBuffer<T>::resetWriteIndex()
+{
+    writeIndex = 0;
+}
+
+//==============================================================================
+
+Histogram::Histogram(const juce::String& title_)
+    : title(title_)
+{
+}
+
+void Histogram::paint(juce::Graphics &g)
+{
+    juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
+    
+    g.fillAll(juce::Colours::black);
+        
+    displayPath(g, localBounds);
+    
+    g.setColour(juce::Colours::white);
+    g.drawText(title, localBounds, juce::Justification(20)); //bottom-centered
+}
+
+void Histogram::resized()
+{
+    // use component width for buffer size
+    buffer.resize(static_cast<size_t>(getWidth()), NEGATIVE_INFINITY);
+}
+
+void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
+{
+    buffer.clear(NEGATIVE_INFINITY);
+    repaint();
+}
+
+void Histogram::update(float value)
+{
+    buffer.write(value);
+    repaint();
+}
+
+void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
+{
+    juce::Path fillPath = buildPath(path, buffer, bounds);
+    
+    if (!fillPath.isEmpty())
+    {
+        g.setColour(juce::Colours::orange.withAlpha(0.5f));
+        g.fillPath(fillPath);
+        
+        g.setColour(juce::Colours::orange);
+        g.strokePath(path, juce::PathStrokeType(1));
+    }
+}
+
+juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<float> &buffer, juce::Rectangle<float> bounds)
+{
+    p.clear();
+    
+    size_t bufferSizeCached = buffer.getSize();
+    size_t readIndexCached = buffer.getReadIndex();
+    std::vector<float>& dataCached = buffer.getData();
+    float bottom = bounds.getBottom();
+    
+    auto map = [=](float db)
+    {
+        float result = juce::jmap(db,NEGATIVE_INFINITY,MAX_DECIBELS,bottom,0.f);
+        return result;
+    };
+    
+    auto incrementAndWrap = [=](std::size_t readIndex)
+    {
+        return (readIndex == bufferSizeCached-1) ? 0 : readIndex+1;
+    };
+            
+    p.startNewSubPath(0, map(dataCached[readIndexCached]));
+    readIndexCached = incrementAndWrap(readIndexCached);
+        
+    for (size_t x = 1; x < bufferSizeCached-1; ++x)
+    {
+        p.lineTo(x, map(dataCached[readIndexCached]));
+        readIndexCached = incrementAndWrap(readIndexCached);
+    }
+    
+    if (bounds.getHeight() <= 0)
+    {
+        return juce::Path();
+    }
+    else
+    {
+        juce::Path fillPath(p);
+        fillPath.lineTo(bounds.getBottomRight());
+        fillPath.lineTo(bounds.getBottomLeft());
+        fillPath.closeSubPath();
+        return fillPath;
+    }
+}
+
+//==============================================================================
 //==============================================================================
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
-      peakStereoMeter(juce::String("Peak"))
+      peakStereoMeter(juce::String("Peak")),
+      peakHistogram(juce::String("Peak"))
 {
     addAndMakeVisible(peakStereoMeter);
+    addAndMakeVisible(peakHistogram);
     
     startTimerHz(refreshRateHz);
     
@@ -492,31 +654,12 @@ void PFM10AudioProcessorEditor::resized()
     auto height = bounds.getHeight();
 
     peakStereoMeter.setTopLeftPosition(0, 0);
-    peakStereoMeter.setSize(width, height);
-    
-//
-//    meter.setTopLeftPosition(bounds.getX()+JUCE_LIVE_CONSTANT(0), bounds.getY()+60);
-//    meter.setSize(width/8, height/2);
-//
-//    dbScale.setBounds(meter.getRight(),
-//                      0,
-//                      30,
-//                      getHeight());
-//    dbScale.buildBackgroundImage(6, //db division
-//                                 meter.getBounds(),
-//                                 NEGATIVE_INFINITY,
-//                                 MAX_DECIBELS);
-//
-//    int textHeight = 12;
-//    auto tempFont = juce::Font(textHeight);
-//    int textMeterWidth = tempFont.getStringWidth("-00.0") + 2;
-//    textMeter.setBounds(meter.getX() + meter.getWidth()/2 - textMeterWidth/2,
-//                        meter.getY() - (textHeight+2),
-//                        textMeterWidth,
-//                        textHeight+2);
-//
+    peakStereoMeter.setSize(width / 4, height * 2/3);
 
-
+    peakHistogram.setBounds(0,
+                            peakStereoMeter.getBottom(),
+                            width,
+                            height - peakStereoMeter.getBottom());
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -529,14 +672,20 @@ void PFM10AudioProcessorEditor::timerCallback()
         }
         
         // get the left channel's peak magnitude within the editor audio buffer
-        float leftChannelMag = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
-        float dbLeftChannelMag = juce::Decibels::gainToDecibels(leftChannelMag, NEGATIVE_INFINITY);
+        float magLeftChannel = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
+        float dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
         
         // get the right channel's peak magnitude within the editor audio buffer
-        float rightChannelMag = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
-        float dbRightChannelMag = juce::Decibels::gainToDecibels(rightChannelMag, NEGATIVE_INFINITY);
+        float magRightChannel = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
+        float dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
         
-        peakStereoMeter.update(dbLeftChannelMag, dbRightChannelMag);
+        // feed them to the stereo peak meter
+        peakStereoMeter.update(dbLeftChannel, dbRightChannel);
+        
+        // get the mono level (avg. of left and right channels), pass to histogram
+        float magPeakMono = (magLeftChannel + magRightChannel) / 2;
+        float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
+        peakHistogram.update(dbPeakMono);
     }
 }
 
