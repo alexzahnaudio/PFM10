@@ -104,7 +104,7 @@ private:
 struct MacroMeter : juce::Component
 {
     MacroMeter();
-    void paint(juce::Graphics&) override;
+//    void paint(juce::Graphics&) override;
     void resized() override;
     void updateLevel(float level);
     int getTextHeight() const;
@@ -144,6 +144,44 @@ private:
     juce::Label label;
 };
 
+template<typename T>
+struct ReadAllAfterWriteCircularBuffer
+{
+    ReadAllAfterWriteCircularBuffer(T fillValue);
+
+    void resize(std::size_t s, T fillValue);
+    void clear(T fillValue);
+    void write(T t);
+
+    std::vector<T>& getData();
+    size_t getReadIndex() const;
+    size_t getSize() const;
+private:
+    std::atomic<std::size_t> writeIndex {0};
+    std::vector<T> data;
+
+    void resetWriteIndex();
+};
+
+struct Histogram : juce::Component
+{
+    Histogram(const juce::String& title_);
+    
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
+    void update(float value);
+private:
+    ReadAllAfterWriteCircularBuffer<float> buffer {float(NEGATIVE_INFINITY)};
+    juce::Path path;
+    const juce::String title;
+    
+    void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
+    static juce::Path buildPath(juce::Path& p,
+                          ReadAllAfterWriteCircularBuffer<float>& buffer,
+                          juce::Rectangle<float> bounds);
+};
+
 //==============================================================================
 /**
 */
@@ -166,8 +204,8 @@ private:
     PFM10AudioProcessor& audioProcessor;
     
     juce::AudioBuffer<float> editorAudioBuffer;
-    
     StereoMeter peakStereoMeter;
+    Histogram peakHistogram;
 
     int refreshRateHz { 60 };
     
