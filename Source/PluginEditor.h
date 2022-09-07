@@ -21,6 +21,11 @@
 #endif
 #define NEGATIVE_INFINITY -66.f
 
+#ifdef  INV_SQRT_OF_2
+#undef  INV_SQRT_OF_2
+#endif
+#define INV_SQRT_OF_2 0.7071f
+
 template<typename T>
 struct Averager
 {
@@ -182,6 +187,21 @@ private:
                           juce::Rectangle<float> bounds);
 };
 
+struct Goniometer : juce::Component
+{
+    Goniometer(juce::AudioBuffer<float>& buffer);
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+private:
+    juce::AudioBuffer<float>& buffer;
+    juce::AudioBuffer<float> internalBuffer;
+    juce::Path p;
+    int w, h;
+    juce::Point<int> center;
+
+    void drawBackground(juce::Graphics& g);
+};
+
 //==============================================================================
 /**
 */
@@ -206,6 +226,7 @@ private:
     juce::AudioBuffer<float> editorAudioBuffer;
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
+    Goniometer goniometer;
 
     int refreshRateHz { 60 };
     

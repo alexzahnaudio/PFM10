@@ -622,15 +622,160 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
 }
 
 //==============================================================================
+
+Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
+    : buffer(_buffer)
+{
+    internalBuffer.setSize(2, 256); // 2 channel, 256 samples
+    internalBuffer.clear();
+}
+
+void Goniometer::resized()
+{
+    w = getWidth();
+    h = getHeight();
+    center = juce::Point<int>( w/2, h/2 );
+}
+
+
+void Goniometer::drawBackground(juce::Graphics &g)
+{
+    int diameter = (w > h) ? h : w;
+    int radius = diameter/2;
+    
+    g.setColour(juce::Colours::grey);
+    
+    // circle
+    g.drawEllipse(center.getX() - radius,
+                  center.getY() - radius,
+                  diameter,
+                  diameter,
+                  1.f);
+    // +S and -S axes (horizontal and vertical)
+    g.fillRect(center.getX() - radius,
+               center.getY(),
+               diameter,
+               1);
+    g.fillRect(center.getX(),
+               center.getY() - radius,
+               1,
+               diameter);
+
+    // L and R axes (diagonals)
+    float radiusDotOrtho = radius * INV_SQRT_OF_2;
+    
+    juce::Point<float> lAxisEndpointA
+    {
+        static_cast<float>(center.getX() - radiusDotOrtho),
+        static_cast<float>(center.getY() - radiusDotOrtho)
+    };
+    juce::Point<float> rAxisEndpointA
+    {
+        static_cast<float>(center.getX() + radiusDotOrtho),
+        static_cast<float>(center.getY() - radiusDotOrtho)
+    };
+    juce::Point<float> lAxisEndpointB
+    {
+        static_cast<float>(center.getX() + radiusDotOrtho),
+        static_cast<float>(center.getY() + radiusDotOrtho)
+    };
+    juce::Point<float> rAxisEndpointB
+    {
+        static_cast<float>(center.getX() - radiusDotOrtho),
+        static_cast<float>(center.getY() + radiusDotOrtho)
+    };
+    
+    g.drawLine(juce::Line<float>(lAxisEndpointA,
+                                 lAxisEndpointB));
+    g.drawLine(juce::Line<float>(rAxisEndpointA,
+                                 rAxisEndpointB));
+    
+    // Draw axis labels
+    juce::Array<juce::String> axisLabels{"+S", "L", "M", "R", "-S"};
+    
+//    g.drawText(axisLabels[0],
+//               center.getX() - radius - 25,
+//               center.getY() - 25,
+//               50,
+//               50,
+//               juce::Justification(33)); // centered left
+}
+
+void Goniometer::paint(juce::Graphics &g)
+{
+    juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
+    if (localBounds.getWidth() > localBounds.getHeight()) localBounds.setWidth(localBounds.getHeight());
+    float bottom = localBounds.getBottom();
+    float top = localBounds.getY();
+    float left = localBounds.getX();
+    float right = localBounds.getRight();
+    
+    drawBackground(g);
+    
+    p.clear();
+    
+    int numSamples = buffer.getNumSamples();
+    
+//    internalBuffer.copyFrom(0,           // destChannel
+//                            0,           // destStartSample
+//                            buffer,      // AudioBuffer<float> &source
+//                            0,           // sourceChannel
+//                            0,           // sourceStartSample
+//                            numSamples); // numSamples
+//    internalBuffer.copyFrom(1,           // destChannel
+//                            0,           // destStartSample
+//                            buffer,      // AudioBuffer<float> &source
+//                            1,           // sourceChannel
+//                            0,           // sourceStartSample
+//                            numSamples); // numSamples
+    
+    float leftSample,
+          rightSample,
+          mid,
+          side,
+          midMapped,
+          sideMapped = 0;
+    
+//    for (int i = 0; i < numSamples; ++i)
+//    {
+//        leftSample = internalBuffer.getSample(0, i);
+//        rightSample = internalBuffer.getSample(1, i);
+//
+//        mid = (leftSample + rightSample) * INV_SQRT_OF_2;
+//        side = (leftSample - rightSample) * INV_SQRT_OF_2;
+//
+//        DBG(mid);
+//        DBG(side);
+//
+////        midMapped = juce::jmap(mid,         // sourceValue,
+////                               -1.f,          // sourceRangeMin,
+////                               1.f,           // sourceRangeMax,
+////                               bottom,      // targetRangeMin,
+////                               top);         // targetRangeMax)
+////        sideMapped = juce::jmap(side,         // sourceValue,
+////                                -1.f,          // sourceRangeMin,
+////                                1.f,           // sourceRangeMax,
+////                                left,           // targetRangeMin,
+////                                right);     // targetRangeMax)
+////
+////        juce::Point<float> samplePosition( side, mid );
+//
+//
+//    }
+}
+
+//==============================================================================
 //==============================================================================
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
       peakStereoMeter(juce::String("Peak")),
-      peakHistogram(juce::String("Peak"))
+      peakHistogram(juce::String("Peak")),
+      goniometer(editorAudioBuffer)
 {
     addAndMakeVisible(peakStereoMeter);
     addAndMakeVisible(peakHistogram);
+    addAndMakeVisible(goniometer);
     
     startTimerHz(refreshRateHz);
     
@@ -660,6 +805,11 @@ void PFM10AudioProcessorEditor::resized()
                             peakStereoMeter.getBottom(),
                             width,
                             height - peakStereoMeter.getBottom());
+    
+    goniometer.setBounds(peakStereoMeter.getRight(),
+                         0.f,
+                         width - peakStereoMeter.getRight(),
+                         peakStereoMeter.getHeight());
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -686,6 +836,8 @@ void PFM10AudioProcessorEditor::timerCallback()
         float magPeakMono = (magLeftChannel + magRightChannel) / 2;
         float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         peakHistogram.update(dbPeakMono);
+        
+        goniometer.repaint();
     }
 }
 
