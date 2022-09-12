@@ -195,11 +195,13 @@ struct Goniometer : juce::Component
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
+    juce::Image backgroundImage;
     juce::Path p;
     int w, h;
+    float radius, diameter;
     juce::Point<int> center;
 
-    void drawBackground(juce::Graphics& g);
+    void buildBackground(juce::Graphics& g);
 };
 
 //==============================================================================
@@ -224,9 +226,13 @@ private:
     PFM10AudioProcessor& audioProcessor;
     
     juce::AudioBuffer<float> editorAudioBuffer;
+    
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
     Goniometer goniometer;
+    
+    int pluginWidth = 800;
+    int pluginHeight = 600;
 
     int refreshRateHz { 60 };
     
