@@ -716,51 +716,31 @@ void Goniometer::buildBackground(juce::Graphics &g)
 void Goniometer::paint(juce::Graphics &g)
 {
     g.drawImageAt(backgroundImage, 0, 0);
-    
-    p.clear();
-    
+        
     int numSamples = buffer.getNumSamples();
     
-//    DBG("num buffer channels = " << buffer.getNumChannels());
-//    DBG("num buffer samples = " << numSamples);
-//    DBG("num internalbuffer samples = " << internalBuffer.getNumSamples());
-//    DBG("num internalbuffer channels = " << internalBuffer.getNumChannels());
-    
-    internalBuffer.copyFrom(0,           // destChannel
-                            0,           // destStartSample
-                            buffer,      // AudioBuffer<float> &source
-                            0,           // sourceChannel
-                            0,           // sourceStartSample
-                            numSamples);          // numSamples
-    internalBuffer.copyFrom(1,           // destChannel
-                            0,           // destStartSample
-                            buffer,      // AudioBuffer<float> &source
-                            1,           // sourceChannel
-                            0,           // sourceStartSample
-                            numSamples);          // numSamples
+    internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
+    internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
     
     float leftSample,
           rightSample,
           mid,
           side,
           midMapped,
-          sideMapped = 0;
+          sideMapped,
+          previousMidMapped = 0.f,
+          previousSideMapped = 0.f,
+          transparency = 0.f;
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
-    float previousMidMapped{0.f};
-    float previousSideMapped{0.f};
-    float transparency{1.f};
     
     for (int i = 0; i < numSamples; ++i)
     {
         leftSample = internalBuffer.getSample(0, i);
         rightSample = internalBuffer.getSample(1, i);
-        if (leftSample == NAN || rightSample == NAN)
-        {
-            continue;
-        }
         
-        mid = (leftSample + rightSample) * INV_SQRT_OF_2;   //mult by invsqrt(2) gives us half power or -3dB
+        //mult by invsqrt(2) gives us half power or -3dB
+        mid = (leftSample + rightSample) * INV_SQRT_OF_2;
         side = (leftSample - rightSample) * INV_SQRT_OF_2;
                 
         midMapped = juce::jmap(mid,
@@ -773,11 +753,14 @@ void Goniometer::paint(juce::Graphics &g)
                                 1.f,
                                 -radius,
                                 radius);
+                
+        if (   std::isnan(midMapped) || std::isnan(sideMapped)
+            || std::isinf(midMapped) || std::isinf(sideMapped))
+        {
+            midMapped = previousMidMapped;
+            sideMapped = previousSideMapped;
+        }
         
-//        DBG("mid mapped sample: " << midMapped);
-//        DBG("side mapped sample: " << sideMapped);
-        
-        p.clear();
         if (i == 0)
         {
             previousMidMapped = midMapped;
@@ -785,26 +768,36 @@ void Goniometer::paint(juce::Graphics &g)
         }
         else
         {
+            // Final sample in buffer gets a pretty dot for a sort of glowing-datapoint effect
+            if (i == numSamples-1)
+            {
+                g.setColour(juce::Colours::antiquewhite);
+                g.fillEllipse(centerX + sideMapped - 2,
+                              centerY + midMapped - 2,
+                              4,
+                              4);
+            }
+            
+            p.clear();
             p.startNewSubPath(centerX + previousSideMapped, centerY + previousMidMapped);
             p.lineTo(centerX + sideMapped, centerY + midMapped);
-            
-            previousMidMapped = midMapped;
-            previousSideMapped = sideMapped;
-            
-            // Try to optimize this...
+                        
+            // Transparency scales from 0 to 1 as the buffer is traversed
+            // The log scaling is for aesthetic purposes
             transparency = juce::jmap(static_cast<float>(i),
                                       1.f,
                                       static_cast<float>(numSamples)-1,
-                                      1.f,
-                                      0.f);
+                                      0.f,
+                                      1.f);
             transparency = juce::mapToLog10(transparency,
                                             0.01f,
                                             1.f);
-            
-            DBG(transparency);
-            
+                                    
             g.setColour(juce::Colour(0.1f, 0.3f, transparency, transparency));
             g.strokePath(p, juce::PathStrokeType(2.f));
+            
+            previousMidMapped = midMapped;
+            previousSideMapped = sideMapped;
         }
     }
 }
