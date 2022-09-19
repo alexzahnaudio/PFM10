@@ -231,8 +231,8 @@ private:
     Histogram peakHistogram;
     Goniometer goniometer;
     
-    int pluginWidth = 800;
-    int pluginHeight = 600;
+    int pluginWidth { 500 };
+    int pluginHeight { 500 };
 
     int refreshRateHz { 60 };
     

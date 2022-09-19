@@ -635,7 +635,7 @@ void Goniometer::resized()
     w = getWidth();
     h = getHeight();
     center = juce::Point<int>( w/2, h/2 );
-    diameter = (w > h) ? h : w;
+    diameter = ((w > h) ? h : w) - 35;      // 35 pixels shorter than the smaller dimension
     radius = diameter/2;
     
     backgroundImage = juce::Image(juce::Image::ARGB, w, h, true);
@@ -646,8 +646,13 @@ void Goniometer::resized()
 
 void Goniometer::buildBackground(juce::Graphics &g)
 {
+    juce::Array<juce::String> axisLabels{"+S", "L", "M", "R", "-S"};
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
+    float radiusDotOrtho = radius * INV_SQRT_OF_2;
+    int radiusInt = static_cast<int>(radius);
+    int radiusDotOrthoInt = static_cast<int>(radiusDotOrtho);
+    int axisLabelSize = 30;
 
     // circle
     g.setColour(juce::Colours::black);
@@ -674,27 +679,25 @@ void Goniometer::buildBackground(juce::Graphics &g)
                diameter);
 
     // L and R axes (diagonals)
-    float radiusDotOrtho = radius * INV_SQRT_OF_2;
-    
     juce::Point<float> lAxisEndpointA
     {
-        static_cast<float>(center.getX() - radiusDotOrtho),
-        static_cast<float>(center.getY() - radiusDotOrtho)
+        centerX - radiusDotOrtho,
+        centerY - radiusDotOrtho
     };
     juce::Point<float> rAxisEndpointA
     {
-        static_cast<float>(center.getX() + radiusDotOrtho),
-        static_cast<float>(center.getY() - radiusDotOrtho)
+        centerX + radiusDotOrtho,
+        centerY - radiusDotOrtho
     };
     juce::Point<float> lAxisEndpointB
     {
-        static_cast<float>(center.getX() + radiusDotOrtho),
-        static_cast<float>(center.getY() + radiusDotOrtho)
+        centerX + radiusDotOrtho,
+        centerY + radiusDotOrtho
     };
     juce::Point<float> rAxisEndpointB
     {
-        static_cast<float>(center.getX() - radiusDotOrtho),
-        static_cast<float>(center.getY() + radiusDotOrtho)
+        centerX - radiusDotOrtho,
+        centerY + radiusDotOrtho
     };
     
     g.drawLine(juce::Line<float>(lAxisEndpointA,
@@ -703,25 +706,51 @@ void Goniometer::buildBackground(juce::Graphics &g)
                                  rAxisEndpointB));
     
     // Draw axis labels
-    juce::Array<juce::String> axisLabels{"+S", "L", "M", "R", "-S"};
+    g.setColour(juce::Colours::white);
     
-//    g.drawText(axisLabels[0],
-//               center.getX() - radius - 25,
-//               center.getY() - 25,
-//               50,
-//               50,
-//               juce::Justification(33)); // centered left
+    // S+
+    g.drawText(axisLabels[0],
+               center.getX() - radiusInt - axisLabelSize,
+               center.getY() - axisLabelSize/2,
+               axisLabelSize,
+               axisLabelSize,
+               juce::Justification(34)); // centered right
+    
+    // L
+    g.drawText(axisLabels[1],
+               center.getX() - radiusDotOrthoInt - axisLabelSize,
+               center.getY() - radiusDotOrthoInt - axisLabelSize,
+               axisLabelSize,
+               axisLabelSize,
+               juce::Justification(18)); // bottom right
+    
+    // M
+    g.drawText(axisLabels[2],
+               center.getX() - axisLabelSize/2,
+               center.getY() - radiusInt - axisLabelSize,
+               axisLabelSize,
+               axisLabelSize,
+               juce::Justification(20)); // bottom center
+    
+    // R
+    g.drawText(axisLabels[3],
+               center.getX() + radiusDotOrthoInt,
+               center.getY() - radiusDotOrthoInt - axisLabelSize,
+               axisLabelSize,
+               axisLabelSize,
+               juce::Justification(17)); // bottom left
+    
+    // S-
+    g.drawText(axisLabels[4],
+               center.getX() + radiusInt,
+               center.getY() - axisLabelSize/2,
+               axisLabelSize,
+               axisLabelSize,
+               juce::Justification(33)); // centered left
 }
 
 void Goniometer::paint(juce::Graphics &g)
 {
-    g.drawImageAt(backgroundImage, 0, 0);
-        
-    int numSamples = buffer.getNumSamples();
-    
-    internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
-    internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
-    
     float leftSample,
           rightSample,
           mid,
@@ -730,9 +759,15 @@ void Goniometer::paint(juce::Graphics &g)
           sideMapped,
           previousMidMapped = 0.f,
           previousSideMapped = 0.f,
-          transparency = 0.f;
+          opacity = 0.f;
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
+    int numSamples = buffer.getNumSamples();
+    
+    g.drawImageAt(backgroundImage, 0, 0);
+    
+    internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
+    internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
     
     for (int i = 0; i < numSamples; ++i)
     {
@@ -783,17 +818,17 @@ void Goniometer::paint(juce::Graphics &g)
             p.lineTo(centerX + sideMapped, centerY + midMapped);
                         
             // Transparency scales from 0 to 1 as the buffer is traversed
-            // The log scaling is for aesthetic purposes
-            transparency = juce::jmap(static_cast<float>(i),
-                                      1.f,
-                                      static_cast<float>(numSamples)-1,
-                                      0.f,
-                                      1.f);
-            transparency = juce::mapToLog10(transparency,
-                                            0.01f,
-                                            1.f);
+            opacity = juce::jmap(static_cast<float>(i),
+                                 1.f,
+                                 static_cast<float>(numSamples)-1,
+                                 0.f,
+                                 1.f);
+            // Apply this log scaling for an aesthetically "snappier" falloff
+            opacity = juce::mapToLog10(opacity,
+                                       0.01f,
+                                       1.f);
                                     
-            g.setColour(juce::Colour(0.1f, 0.3f, transparency, transparency));
+            g.setColour(juce::Colour(0.1f, 0.3f, opacity, opacity));
             g.strokePath(p, juce::PathStrokeType(2.f));
             
             previousMidMapped = midMapped;
@@ -820,9 +855,9 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     
     setSize (pluginWidth, pluginHeight);
     
-    setResizable(false, false);
-    setResizeLimits(800, 600,    //min
-                    1200, 900); //max
+//    setResizable(false, false);
+//    setResizeLimits(600, 600,    //min
+//                    900, 900);  //max
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
