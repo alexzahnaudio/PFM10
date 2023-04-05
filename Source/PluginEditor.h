@@ -206,7 +206,7 @@ private:
 
 struct CorrelationMeter : juce::Component
 {
-    CorrelationMeter(juce::AudioBuffer<float>& buf, double sampleRate);
+    CorrelationMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
     void paint(juce::Graphics& g) override;
     void update();
 private:
@@ -221,6 +221,16 @@ private:
                      juce::Rectangle<int> bounds,
                      float average,
                      bool drawBorder);
+};
+
+struct StereoImageMeter : juce::Component
+{
+    StereoImageMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
+    void resized() override;
+    void update();
+private:
+    Goniometer goniometer;
+    CorrelationMeter correlationMeter;
 };
 
 //==============================================================================
@@ -248,8 +258,7 @@ private:
     
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
-    Goniometer goniometer;
-    CorrelationMeter correlationMeter;
+    StereoImageMeter stereoImageMeter;
     
     int pluginWidth { 700 };
     int pluginHeight { 600 };

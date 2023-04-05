@@ -957,6 +957,36 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
 }
 
 //==============================================================================
+
+StereoImageMeter::StereoImageMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
+    : goniometer(_buffer),
+      correlationMeter(_buffer, _sampleRate)
+{
+    addAndMakeVisible(goniometer);
+    addAndMakeVisible(correlationMeter);
+}
+
+void StereoImageMeter::resized()
+{
+    float gonioToCorrMeterHeightRatio = 0.9f;
+    
+    goniometer.setBoundsRelative(0.f,
+                                 0.f,
+                                 1.f,
+                                 gonioToCorrMeterHeightRatio);
+    correlationMeter.setBoundsRelative(0.f,
+                                       gonioToCorrMeterHeightRatio,
+                                       1.f,
+                                       1.f - gonioToCorrMeterHeightRatio);
+}
+
+void StereoImageMeter::update()
+{
+    goniometer.repaint();
+    correlationMeter.update();
+}
+
+//==============================================================================
 //==============================================================================
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
@@ -964,13 +994,11 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
       editorAudioBuffer(2, 512),
       peakStereoMeter(juce::String("Peak")),
       peakHistogram(juce::String("Peak")),
-      goniometer(editorAudioBuffer),
-      correlationMeter(editorAudioBuffer, audioProcessor.getSampleRate())
+      stereoImageMeter(editorAudioBuffer, audioProcessor.getSampleRate())
 {
     addAndMakeVisible(peakStereoMeter);
     addAndMakeVisible(peakHistogram);
-    addAndMakeVisible(goniometer);
-    addAndMakeVisible(correlationMeter);
+    addAndMakeVisible(stereoImageMeter);
     
     startTimerHz(refreshRateHz);
     
@@ -1005,15 +1033,10 @@ void PFM10AudioProcessorEditor::resized()
                             width,
                             height - peakStereoMeter.getBottom());
     
-    goniometer.setBounds(peakStereoMeter.getRight(),
-                         0.f,
-                         width - peakStereoMeter.getRight(),
-                         peakStereoMeter.getHeight() * 9/10);
-    
-    correlationMeter.setBounds(peakStereoMeter.getRight(),
-                               goniometer.getBottom(),
+    stereoImageMeter.setBounds(peakStereoMeter.getRight(),
+                               0,
                                width - peakStereoMeter.getRight(),
-                               height - goniometer.getHeight() - peakHistogram.getHeight());
+                               height - peakHistogram.getHeight());
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -1041,9 +1064,8 @@ void PFM10AudioProcessorEditor::timerCallback()
         float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         peakHistogram.update(dbPeakMono);
         
-        goniometer.repaint();
-        
-        correlationMeter.update();
+        // update the goniometer and correlation meter
+        stereoImageMeter.update();
     }
 }
 
