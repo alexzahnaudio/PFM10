@@ -61,11 +61,11 @@
       </OUTPUTS>
     </LAYOUT>
   </FILTER>
-  <FILTER uid="11" x="0.4974182444061962" y="0.4828767123287671" uiLastX_Normal="287"
-          uiLastY_Normal="332" uiopen_Normal="1">
+  <FILTER uid="11" x="0.4991394148020654" y="0.6027397260273972" uiLastX_Normal="561"
+          uiLastY_Normal="227" uiopen_Normal="1">
     <PLUGIN name="PFM10" format="VST3" category="Fx" manufacturer="Alex Zahn"
             version="1.0.0" file="/Users/alex/Library/Audio/Plug-Ins/VST3/PFM10.vst3"
-            uniqueId="f0a8dd1d" isInstrument="0" fileTime="181ac630bb8" infoUpdateTime="1832f67ed54"
+            uniqueId="f0a8dd1d" isInstrument="0" fileTime="181ac630bb8" infoUpdateTime="186bf3101cc"
             numInputs="2" numOutputs="2" isShell="0" uid="acf4569f"/>
     <STATE>191.VMjLgXK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9XCLt3hKt3hKt3hKt3hYRUUSTEETIckVwTjQisVTTgkdEYjKAQjYPQSPWgUdMcjKAQjct3hdA4hKt3hKt3hKtnTUv.UQAslXuk0UXoWUFE0YQcEV77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9..</STATE>
     <LAYOUT>
@@ -77,8 +77,26 @@
       </OUTPUTS>
     </LAYOUT>
   </FILTER>
-  <CONNECTION srcFilter="7" srcChannel="0" dstFilter="11" dstChannel="0"/>
-  <CONNECTION srcFilter="7" srcChannel="1" dstFilter="11" dstChannel="1"/>
+  <FILTER uid="14" x="0.6506024096385542" y="0.3664383561643836" uiLastX_Normal="802"
+          uiLastY_Normal="196" uiopen_Normal="0">
+    <PLUGIN name="AUDynamicsProcessor" format="AudioUnit" category="Effect"
+            manufacturer="Apple" version="1.6.0" file="AudioUnit:Effects/aufx,dcmp,appl"
+            uniqueId="64667b64" isInstrument="0" fileTime="0" infoUpdateTime="186bf3101cc"
+            numInputs="2" numOutputs="2" isShell="0" uid="64667b64"/>
+    <STATE>234.hAGaoMGcv.y0AHv.DTfAGfPBJr.CM3.WsEla0YVXiQWcxUlbTQVXzE1VTglbkMGZuwFYOszUyUmXzkGbkckckI2bo8laTQWdvUFUtEVakIQXvAGaOAAQ..............vA.....DDn......P.AAJ......HvO.B......CHLx.......A9jYlZB...T.PU.1M....FHDH...DAHAYi0FbP.fDgUmY38EDOXTXyQGHg4FYfLUau8FcngvEjjRM8TjROQ0lcJJooB.......DP..........7....................vt</STATE>
+    <LAYOUT>
+      <INPUTS>
+        <BUS index="0" layout="L R"/>
+      </INPUTS>
+      <OUTPUTS>
+        <BUS index="0" layout="L R"/>
+      </OUTPUTS>
+    </LAYOUT>
+  </FILTER>
+  <CONNECTION srcFilter="7" srcChannel="0" dstFilter="14" dstChannel="0"/>
+  <CONNECTION srcFilter="7" srcChannel="1" dstFilter="14" dstChannel="1"/>
   <CONNECTION srcFilter="11" srcChannel="0" dstFilter="9" dstChannel="0"/>
   <CONNECTION srcFilter="11" srcChannel="1" dstFilter="9" dstChannel="1"/>
+  <CONNECTION srcFilter="14" srcChannel="0" dstFilter="11" dstChannel="0"/>
+  <CONNECTION srcFilter="14" srcChannel="1" dstFilter="11" dstChannel="1"/>
 </FILTERGRAPH>

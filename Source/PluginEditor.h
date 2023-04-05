@@ -204,6 +204,35 @@ private:
     void buildBackground(juce::Graphics& g);
 };
 
+struct CorrelationMeter : juce::Component
+{
+    CorrelationMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
+    void paint(juce::Graphics& g) override;
+    void update();
+private:
+    juce::AudioBuffer<float>& buffer;
+    
+    std::array<juce::dsp::FIR::Filter<float>, 3> filters;
+
+    Averager<float> slowAverager{1024*4, 0},
+                    peakAverager{512, 0};
+    
+    void drawAverage(juce::Graphics& g,
+                     juce::Rectangle<int> bounds,
+                     float average,
+                     bool drawBorder);
+};
+
+struct StereoImageMeter : juce::Component
+{
+    StereoImageMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
+    void resized() override;
+    void update();
+private:
+    Goniometer goniometer;
+    CorrelationMeter correlationMeter;
+};
+
 //==============================================================================
 /**
 */
@@ -229,10 +258,10 @@ private:
     
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
-    Goniometer goniometer;
+    StereoImageMeter stereoImageMeter;
     
-    int pluginWidth { 500 };
-    int pluginHeight { 500 };
+    int pluginWidth { 700 };
+    int pluginHeight { 600 };
 
     int refreshRateHz { 60 };
     

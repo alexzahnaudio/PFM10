@@ -31,9 +31,9 @@ void Averager<T>::clear(T initialValue)
     }
     
     writeIndex = 0;
+    avg = 0.f;
+    sum = static_cast<T>(0);
     
-    //update average
-    //update sum
 }
 
 template<typename T>
@@ -267,7 +267,7 @@ void Meter::update(float dbLevel)
 //==============================================================================
 
 MacroMeter::MacroMeter()
-: averager(60, 0)
+: averager(30, 0)
 {
     addAndMakeVisible(peakTextMeter);
     addAndMakeVisible(peakMeter);
@@ -763,7 +763,7 @@ void Goniometer::paint(juce::Graphics &g)
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
     int numSamples = buffer.getNumSamples();
-    
+        
     g.drawImageAt(backgroundImage, 0, 0);
     
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
@@ -773,7 +773,7 @@ void Goniometer::paint(juce::Graphics &g)
     {
         leftSample = internalBuffer.getSample(0, i);
         rightSample = internalBuffer.getSample(1, i);
-        
+
         //mult by invsqrt(2) gives us half power or -3dB
         mid = (leftSample + rightSample) * INV_SQRT_OF_2;
         side = (leftSample - rightSample) * INV_SQRT_OF_2;
@@ -788,14 +788,14 @@ void Goniometer::paint(juce::Graphics &g)
                                 1.f,
                                 -radius,
                                 radius);
-                
-        if (   std::isnan(midMapped) || std::isnan(sideMapped)
-            || std::isinf(midMapped) || std::isinf(sideMapped))
+        
+        if (   std::isnan(leftSample) || std::isnan(rightSample)
+            || std::isinf(leftSample) || std::isinf(rightSample))
         {
             midMapped = previousMidMapped;
             sideMapped = previousSideMapped;
         }
-        
+            
         if (i == 0)
         {
             previousMidMapped = midMapped;
@@ -838,6 +838,155 @@ void Goniometer::paint(juce::Graphics &g)
 }
 
 //==============================================================================
+
+CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
+    : buffer(_buffer)
+{
+    // Initialize moving-average windows via FIR low-pass filters
+    
+    using FilterDesign = juce::dsp::FilterDesign<float>;
+    using WindowingMethod = juce::dsp::WindowingFunction<float>::WindowingMethod;
+    
+    FilterDesign::FIRCoefficientsPtr coefficientsPtr( FilterDesign::designFIRLowpassWindowMethod(10.f, //frequency
+                                                                                                 _sampleRate,
+                                                                                                 1, //order
+                                                                                                 WindowingMethod::rectangular) );
+
+    for (juce::dsp::FIR::Filter<float> &filter : filters)
+    {
+        filter = juce::dsp::FIR::Filter<float>(coefficientsPtr);
+
+    }
+}
+
+void CorrelationMeter::paint(juce::Graphics &g)
+{
+    juce::Rectangle<int> meterArea = getLocalBounds()
+    .withTrimmedBottom(20)
+    .withTrimmedLeft(10)
+    .withTrimmedRight(10);
+    
+    float slowMeterHeightPercentage = 0.75f;
+    
+    // Skinny peak-average meter on top
+    drawAverage(g,
+                meterArea.withTrimmedBottom(static_cast<int>( meterArea.getHeight() * slowMeterHeightPercentage )),
+                peakAverager.getAvg(),
+                true);
+    // Thicker slow-average meter on bottom
+    drawAverage(g,
+                meterArea.withTrimmedTop(static_cast<int>( meterArea.getHeight() * (1 - slowMeterHeightPercentage) )),
+                slowAverager.getAvg(),
+                true);
+    
+    // Text Labels
+    g.setColour(juce::Colours::white);
+    g.drawText("-1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomLeft));
+    g.drawText("0",  getLocalBounds(), juce::Justification(juce::Justification::Flags::centredBottom));
+    g.drawText("+1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomRight));
+}
+
+void CorrelationMeter::update()
+{
+    int numSamples = buffer.getNumSamples();
+    
+    for (int iSample = 0; iSample < numSamples; ++iSample)
+    {
+        float leftSample = buffer.getSample(0, iSample);
+        float rightSample = buffer.getSample(1, iSample);
+        
+        // Feed L and R samples into correlation math equation
+        float numerator = filters[0].processSample( leftSample * rightSample );
+        float denominator = sqrt( filters[1].processSample(juce::square(leftSample))
+                                * filters[2].processSample(juce::square(rightSample)) );
+        float c = numerator / denominator;
+                
+        // Feed correlation result into averagers
+        if ( std::isnan(c) || std::isinf(c) )
+        {
+            slowAverager.add(0);
+            peakAverager.add(0);
+        }
+        else
+        {
+            slowAverager.add(c);
+            peakAverager.add(c);
+        }
+    }
+    
+    repaint();
+}
+
+void CorrelationMeter::drawAverage(juce::Graphics& g,
+                                   juce::Rectangle<int> bounds,
+                                   float average,
+                                   bool drawBorder)
+{
+    int width = bounds.getWidth();
+    int height = bounds.getHeight();
+    int centerX = bounds.getCentreX();
+    
+    g.setColour(juce::Colours::black);
+    g.fillRect(bounds);
+    
+    int averageMapped = static_cast<int>(juce::jmap(abs(average),
+                                                    0.f,
+                                                    width/2.f));
+    
+    g.setColour(juce::Colours::orange);
+    if (average < 0)
+    {
+        g.fillRect(centerX - averageMapped,
+                   bounds.getY(),
+                   averageMapped,
+                   height);
+    }
+    else
+    {
+        g.fillRect(centerX,
+                   bounds.getY(),
+                   averageMapped,
+                   height);
+    }
+    
+    if (drawBorder)
+    {
+        g.setColour(juce::Colours::lightgrey);
+        g.drawRect(bounds);
+    }
+}
+
+//==============================================================================
+
+StereoImageMeter::StereoImageMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
+    : goniometer(_buffer),
+      correlationMeter(_buffer, _sampleRate)
+{
+    addAndMakeVisible(goniometer);
+    addAndMakeVisible(correlationMeter);
+}
+
+void StereoImageMeter::resized()
+{
+    float gonioToCorrMeterHeightRatio = 0.9f;
+    
+    goniometer.setBoundsRelative(0.f,
+                                 0.f,
+                                 1.f,
+                                 gonioToCorrMeterHeightRatio);
+    correlationMeter.setBoundsRelative(0.f,
+                                       gonioToCorrMeterHeightRatio,
+                                       1.f,
+                                       1.f - gonioToCorrMeterHeightRatio);
+}
+
+void StereoImageMeter::update()
+{
+    goniometer.repaint();
+    correlationMeter.update();
+}
+
+//==============================================================================
 //==============================================================================
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
@@ -845,11 +994,11 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
       editorAudioBuffer(2, 512),
       peakStereoMeter(juce::String("Peak")),
       peakHistogram(juce::String("Peak")),
-      goniometer(editorAudioBuffer)
+      stereoImageMeter(editorAudioBuffer, audioProcessor.getSampleRate())
 {
     addAndMakeVisible(peakStereoMeter);
     addAndMakeVisible(peakHistogram);
-    addAndMakeVisible(goniometer);
+    addAndMakeVisible(stereoImageMeter);
     
     startTimerHz(refreshRateHz);
     
@@ -884,10 +1033,10 @@ void PFM10AudioProcessorEditor::resized()
                             width,
                             height - peakStereoMeter.getBottom());
     
-    goniometer.setBounds(peakStereoMeter.getRight(),
-                         0.f,
-                         width - peakStereoMeter.getRight(),
-                         peakStereoMeter.getHeight());
+    stereoImageMeter.setBounds(peakStereoMeter.getRight(),
+                               0,
+                               width - peakStereoMeter.getRight(),
+                               height - peakHistogram.getHeight());
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
@@ -915,7 +1064,8 @@ void PFM10AudioProcessorEditor::timerCallback()
         float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         peakHistogram.update(dbPeakMono);
         
-        goniometer.repaint();
+        // update the goniometer and correlation meter
+        stereoImageMeter.update();
     }
 }
 
