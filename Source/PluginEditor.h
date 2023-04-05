@@ -26,6 +26,48 @@
 #endif
 #define INV_SQRT_OF_2 0.7071f
 
+//==============================================================================
+// Look And Feel classes
+//==============================================================================
+struct LAF_ThresholdSlider : juce::LookAndFeel_V4
+{
+    LAF_ThresholdSlider()
+    {
+        setColour(juce::Slider::thumbColourId, juce::Colours::red);
+        setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentWhite);
+    }
+private:
+    float thumbWidth { 2.0f };
+    
+    void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                          float sliderPos,
+                          float minSliderPos,
+                          float maxSliderPos,
+                          const juce::Slider::SliderStyle style, juce::Slider& slider) override
+    {
+        // This Look-And-Feel class is designed specifically for linear-bar style sliders!
+        //
+        // If you intend to expand this to handle other slider styles, then change this jassert
+        // to an if(slider.isBar()) condition and add an else block (see default LAF_V4 implementation),
+        // or create a different custom LAF class.
+        jassert (slider.isBar());
+
+        g.setColour (slider.findColour (juce::Slider::thumbColourId));
+        g.fillRect (slider.isHorizontal() ? juce::Rectangle<float> (sliderPos - thumbWidth,
+                                                                    (float) y + 0.5f,
+                                                                    thumbWidth,
+                                                                    (float) height - 1.0f)
+                                          : juce::Rectangle<float> ((float) x + 0.5f,
+                                                                    sliderPos,
+                                                                    (float) width - 1.0f,
+                                                                    thumbWidth));
+    }
+};
+    
+//==============================================================================
+// JUCE Components and custom classes
+//==============================================================================
+
 template<typename T>
 struct Averager
 {
@@ -109,12 +151,13 @@ private:
 struct MacroMeter : juce::Component
 {
     MacroMeter();
-//    void paint(juce::Graphics&) override;
     void resized() override;
     void updateLevel(float level);
-    int getTextHeight() const;
+    int getTextHeight() const { return textHeight; }
+    int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
+    int getMeterHeight() const { return peakMeter.getHeight(); }
 private:
-    int textHeight {12};
+    int textHeight { 12 };
     TextMeter peakTextMeter;
     Meter peakMeter;
     Meter averageMeter;
@@ -140,13 +183,17 @@ private:
 struct StereoMeter : juce::Component
 {
     StereoMeter(juce::String meterName);
+    ~StereoMeter() override;
     void resized() override;
     void update(float leftChannelDb, float rightChannelDb);
 private:
+    LAF_ThresholdSlider thresholdSliderLAF;
+
     MacroMeter leftMacroMeter;
     MacroMeter rightMacroMeter;
     DbScale dbScale;
     juce::Label label;
+    juce::Slider thresholdSlider;
 };
 
 template<typename T>
@@ -248,7 +295,7 @@ public:
     //==============================================================================
     void timerCallback() override;
     int getRefreshRateHz() const;
-
+    
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.

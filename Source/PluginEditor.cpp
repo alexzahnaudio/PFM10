@@ -9,6 +9,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+//==============================================================================
+// JUCE Components and custom classes
+//==============================================================================
+
 template<typename T>
 Averager<T>::Averager(size_t numElements, T initialValue)
 {
@@ -236,7 +240,6 @@ void Meter::paint(juce::Graphics& g)
     dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
     meterFillRect.setY(dbPeakMapped);
     
-    // TO DO: gradated color change on meter e.g. Red above 0db
     g.setColour(juce::Colours::orange);
     g.fillRect(meterFillRect);
     
@@ -274,10 +277,6 @@ MacroMeter::MacroMeter()
     addAndMakeVisible(averageMeter);
 }
 
-//void MacroMeter::paint(juce::Graphics &g)
-//{
-//}
-
 void MacroMeter::resized()
 {
     auto bounds = getLocalBounds();
@@ -310,11 +309,6 @@ void MacroMeter::updateLevel(float level)
     
     averager.add(level);
     averageMeter.update(averager.getAvg());
-}
-
-int MacroMeter::getTextHeight() const
-{
-    return textHeight;
 }
 
 //==============================================================================
@@ -421,9 +415,20 @@ StereoMeter::StereoMeter(juce::String meterName)
     addAndMakeVisible(leftMacroMeter);
     addAndMakeVisible(rightMacroMeter);
     addAndMakeVisible(dbScale);
-    addAndMakeVisible(label);
-
+    
     label.setText("L  " + meterName + "  R", juce::dontSendNotification);
+    addAndMakeVisible(label);
+    
+    // threshold slider style / look-and-feel
+    thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
+    thresholdSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::NoTextBox, true, 10, 10);
+    thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
+    addAndMakeVisible(thresholdSlider);
+}
+
+StereoMeter::~StereoMeter()
+{
+    thresholdSlider.setLookAndFeel(nullptr);
 }
 
 void StereoMeter::resized()
@@ -453,6 +458,11 @@ void StereoMeter::resized()
                     rightMacroMeter.getRight()-leftMacroMeter.getX(),
                     50);
     label.setJustificationType(juce::Justification(12)); // top-centered
+    
+    thresholdSlider.setBounds(dbScale.getX(),
+                              leftMacroMeter.getTextHeight(),
+                              dbScale.getWidth(),
+                              leftMacroMeter.getMeterHeight());
 }
 
 void StereoMeter::update(float leftChannelDb, float rightChannelDb)
@@ -1000,13 +1010,13 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     addAndMakeVisible(peakHistogram);
     addAndMakeVisible(stereoImageMeter);
     
-    startTimerHz(refreshRateHz);
-    
     setSize (pluginWidth, pluginHeight);
     
 //    setResizable(false, false);
 //    setResizeLimits(600, 600,    //min
 //                    900, 900);  //max
+    
+    startTimerHz(refreshRateHz);
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
