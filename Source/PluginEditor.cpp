@@ -425,7 +425,7 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     // update value tree when threshold slider value is changed
     thresholdSlider.onValueChange = [this] {vt.setProperty("thresholdValue", thresholdSlider.getValue(), nullptr);};
     // threshold slider range, style, look-and-feel
-    thresholdSlider.setRange(0.0f, 1.0f);
+    thresholdSlider.setRange(NEGATIVE_INFINITY, MAX_DECIBELS);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::NoTextBox, true, 10, 10);
     thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
