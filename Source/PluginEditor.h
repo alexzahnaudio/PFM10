@@ -180,13 +180,20 @@ private:
     juce::Image bkgd;
 };
 
-struct StereoMeter : juce::Component
+struct StereoMeter : juce::Component, juce::ValueTree::Listener
 {
-    StereoMeter(juce::String meterName);
+    StereoMeter(juce::ValueTree _vt, juce::String _meterName);
     ~StereoMeter() override;
     void resized() override;
     void update(float leftChannelDb, float rightChannelDb);
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
+
+    // Look and Feel
     LAF_ThresholdSlider thresholdSliderLAF;
 
     MacroMeter leftMacroMeter;
@@ -300,6 +307,9 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PFM10AudioProcessor& audioProcessor;
+    
+    juce::ValueTree valueTree;
+    void initValueTree();
     
     juce::AudioBuffer<float> editorAudioBuffer;
     

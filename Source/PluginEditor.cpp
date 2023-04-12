@@ -410,25 +410,40 @@ void DbScale::buildBackgroundImage(int dbDivision,
 
 //==============================================================================
 
-StereoMeter::StereoMeter(juce::String meterName)
+StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
+    : vt(_vt)
 {
+    vt.addListener(this);
+    
     addAndMakeVisible(leftMacroMeter);
     addAndMakeVisible(rightMacroMeter);
     addAndMakeVisible(dbScale);
     
-    label.setText("L  " + meterName + "  R", juce::dontSendNotification);
+    label.setText("L  " + _meterName + "  R", juce::dontSendNotification);
     addAndMakeVisible(label);
     
-    // threshold slider style / look-and-feel
+    // update value tree when threshold slider value is changed
+    thresholdSlider.onValueChange = [this] {vt.setProperty("thresholdValue", thresholdSlider.getValue(), nullptr);};
+    // threshold slider range, style, look-and-feel
+    thresholdSlider.setRange(0.0f, 1.0f);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::NoTextBox, true, 10, 10);
     thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
+    // add and make slider visible
     addAndMakeVisible(thresholdSlider);
 }
 
 StereoMeter::~StereoMeter()
 {
     thresholdSlider.setLookAndFeel(nullptr);
+}
+
+void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_thresholdValue)
+    {
+//        DBG(juce::String(_vt.getProperty(ID_thresholdValue)));
+    }
 }
 
 void StereoMeter::resized()
@@ -1001,14 +1016,13 @@ void StereoImageMeter::update()
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
+      valueTree(juce::Identifier("root")),
       editorAudioBuffer(2, 512),
-      peakStereoMeter(juce::String("Peak")),
+      peakStereoMeter(valueTree, juce::String("Peak")),
       peakHistogram(juce::String("Peak")),
       stereoImageMeter(editorAudioBuffer, audioProcessor.getSampleRate())
 {
-    addAndMakeVisible(peakStereoMeter);
-    addAndMakeVisible(peakHistogram);
-    addAndMakeVisible(stereoImageMeter);
+    initValueTree();
     
     setSize (pluginWidth, pluginHeight);
     
@@ -1016,11 +1030,24 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
 //    setResizeLimits(600, 600,    //min
 //                    900, 900);  //max
     
+    addAndMakeVisible(peakStereoMeter);
+    addAndMakeVisible(peakHistogram);
+    addAndMakeVisible(stereoImageMeter);
+    
     startTimerHz(refreshRateHz);
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
 {
+}
+
+void PFM10AudioProcessorEditor::initValueTree()
+{
+    // Property Identifiers
+    static juce::Identifier thresholdValue ("thresholdValue");
+    
+    // Set Up Properties using Identifiers
+    valueTree.setProperty(thresholdValue, 0.f, nullptr);
 }
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
