@@ -232,16 +232,26 @@ void Meter::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
     
-    juce::Rectangle<float> meterFillRect(getLocalBounds().toFloat());
-    float yMin = meterFillRect.getBottom();
-    float yMax = meterFillRect.getY();
-    
+    juce::Rectangle<float> meterBounds = getLocalBounds().toFloat();
+    float yMin = meterBounds.getBottom();
+    float yMax = meterBounds.getY();
+            
     auto dbPeakMapped = juce::jmap(dbPeak, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
     dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
-    meterFillRect.setY(dbPeakMapped);
     
+    juce::Rectangle<float> meterFillRect = meterBounds.withY(dbPeakMapped);
     g.setColour(juce::Colours::orange);
     g.fillRect(meterFillRect);
+    
+    // Red rectangle fill for peaks above threshold value
+    if (dbPeak > dbThreshold)
+    {
+        auto yThreshold = juce::jmap(dbThreshold, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
+                
+        juce::Rectangle<float> thresholdFillRect = meterFillRect.withBottom(yThreshold);
+        g.setColour(juce::Colours::red);
+        g.fillRect(thresholdFillRect);
+    }
     
     // Decaying Peak Level Tick Mark
     juce::Rectangle<float> peakLevelTickMark(meterFillRect);
@@ -309,6 +319,12 @@ void MacroMeter::updateLevel(float level)
     
     averager.add(level);
     averageMeter.update(averager.getAvg());
+}
+
+void MacroMeter::updateThreshold(float dbLevel)
+{
+    peakMeter.setThreshold(dbLevel);
+    averageMeter.setThreshold(dbLevel);
 }
 
 //==============================================================================
@@ -442,7 +458,10 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
 {
     if (_ID == ID_thresholdValue)
     {
-//        DBG(juce::String(_vt.getProperty(ID_thresholdValue)));
+        float dbLevel = _vt.getProperty(ID_thresholdValue);
+        
+        leftMacroMeter.updateThreshold(dbLevel);
+        rightMacroMeter.updateThreshold(dbLevel);
     }
 }
 

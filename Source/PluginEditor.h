@@ -143,8 +143,10 @@ struct Meter : juce::Component
 {
     void paint (juce::Graphics&) override;
     void update(float dbLevel);
+    void setThreshold(float dbLevel) { dbThreshold = dbLevel; }
 private:
     float dbPeak { NEGATIVE_INFINITY };
+    float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
 };
 
@@ -153,6 +155,8 @@ struct MacroMeter : juce::Component
     MacroMeter();
     void resized() override;
     void updateLevel(float level);
+    void updateThreshold(float dbLevel);
+    //==============================================================================
     int getTextHeight() const { return textHeight; }
     int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
     int getMeterHeight() const { return peakMeter.getHeight(); }
