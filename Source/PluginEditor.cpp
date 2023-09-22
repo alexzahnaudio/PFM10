@@ -9,6 +9,11 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+//==============================================================================
+// JUCE Components and custom classes
+//==============================================================================
+
+//MARK: - Averager
 template<typename T>
 Averager<T>::Averager(size_t numElements, T initialValue)
 {
@@ -60,6 +65,7 @@ void Averager<T>::add(T t)
 }
 
 //==============================================================================
+//MARK: - DecayingValueHolder
 
 DecayingValueHolder::DecayingValueHolder()
 {
@@ -122,6 +128,7 @@ juce::int64 DecayingValueHolder::getNow()
 }
 
 //==============================================================================
+//MARK: - ValueHolder
 
 ValueHolder::ValueHolder()
 {
@@ -169,6 +176,7 @@ void ValueHolder::updateHeldValue(float v)
 }
 
 //==============================================================================
+//MARK: - TextMeter
 
 TextMeter::TextMeter()
 {
@@ -183,8 +191,8 @@ void TextMeter::paint(juce::Graphics &g)
     
     if (valueHolder.getIsOverThreshold())
     {
-        g.fillAll(juce::Colours::red);
-        textColor = juce::Colours::black;
+        g.fillAll(juce::Colours::black);
+        textColor = juce::Colours::red;
         
         valueToDisplay = valueHolder.getHeldValue();
     }
@@ -222,23 +230,39 @@ void TextMeter::update(float valueDb)
     repaint();
 }
 
+void TextMeter::setThreshold(float dbLevel)
+{
+    dbThreshold = dbLevel;
+    valueHolder.setThreshold(dbLevel);
+}
+
 //==============================================================================
+//MARK: - Meter
 
 void Meter::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
     
-    juce::Rectangle<float> meterFillRect(getLocalBounds().toFloat());
-    float yMin = meterFillRect.getBottom();
-    float yMax = meterFillRect.getY();
-    
+    juce::Rectangle<float> meterBounds = getLocalBounds().toFloat();
+    float yMin = meterBounds.getBottom();
+    float yMax = meterBounds.getY();
+            
     auto dbPeakMapped = juce::jmap(dbPeak, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
     dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
-    meterFillRect.setY(dbPeakMapped);
     
-    // TO DO: gradated color change on meter e.g. Red above 0db
+    juce::Rectangle<float> meterFillRect = meterBounds.withY(dbPeakMapped);
     g.setColour(juce::Colours::orange);
     g.fillRect(meterFillRect);
+    
+    // Red rectangle fill for peaks above threshold value
+    if (dbPeak > dbThreshold)
+    {
+        auto yThreshold = juce::jmap(dbThreshold, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
+                
+        juce::Rectangle<float> thresholdFillRect = meterFillRect.withBottom(yThreshold);
+        g.setColour(juce::Colours::red);
+        g.fillRect(thresholdFillRect);
+    }
     
     // Decaying Peak Level Tick Mark
     juce::Rectangle<float> peakLevelTickMark(meterFillRect);
@@ -265,6 +289,7 @@ void Meter::update(float dbLevel)
 }
 
 //==============================================================================
+//MARK: - MacroMeter
 
 MacroMeter::MacroMeter()
 : averager(30, 0)
@@ -273,10 +298,6 @@ MacroMeter::MacroMeter()
     addAndMakeVisible(peakMeter);
     addAndMakeVisible(averageMeter);
 }
-
-//void MacroMeter::paint(juce::Graphics &g)
-//{
-//}
 
 void MacroMeter::resized()
 {
@@ -312,12 +333,15 @@ void MacroMeter::updateLevel(float level)
     averageMeter.update(averager.getAvg());
 }
 
-int MacroMeter::getTextHeight() const
+void MacroMeter::updateThreshold(float dbLevel)
 {
-    return textHeight;
+    peakMeter.setThreshold(dbLevel);
+    peakTextMeter.setThreshold(dbLevel);
+    averageMeter.setThreshold(dbLevel);
 }
 
 //==============================================================================
+//MARK: - DbScale
 
 void DbScale::paint(juce::Graphics &g)
 {
@@ -415,15 +439,45 @@ void DbScale::buildBackgroundImage(int dbDivision,
 }
 
 //==============================================================================
+//MARK: - StereoMeter
 
-StereoMeter::StereoMeter(juce::String meterName)
+StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
+    : vt(_vt)
 {
+    vt.addListener(this);
+    
     addAndMakeVisible(leftMacroMeter);
     addAndMakeVisible(rightMacroMeter);
     addAndMakeVisible(dbScale);
+    
+    label.setText("L  " + _meterName + "  R", juce::dontSendNotification);
     addAndMakeVisible(label);
+    
+    // update value tree when threshold slider value is changed
+    thresholdSlider.onValueChange = [this] {vt.setProperty("thresholdValue", thresholdSlider.getValue(), nullptr);};
+    // threshold slider range, style, look-and-feel
+    thresholdSlider.setRange(NEGATIVE_INFINITY, MAX_DECIBELS);
+    thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
+    thresholdSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::NoTextBox, true, 10, 10);
+    thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
+    // add and make slider visible
+    addAndMakeVisible(thresholdSlider);
+}
 
-    label.setText("L  " + meterName + "  R", juce::dontSendNotification);
+StereoMeter::~StereoMeter()
+{
+    thresholdSlider.setLookAndFeel(nullptr);
+}
+
+void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_thresholdValue)
+    {
+        float dbLevel = _vt.getProperty(ID_thresholdValue);
+        
+        leftMacroMeter.updateThreshold(dbLevel);
+        rightMacroMeter.updateThreshold(dbLevel);
+    }
 }
 
 void StereoMeter::resized()
@@ -453,6 +507,11 @@ void StereoMeter::resized()
                     rightMacroMeter.getRight()-leftMacroMeter.getX(),
                     50);
     label.setJustificationType(juce::Justification(12)); // top-centered
+    
+    thresholdSlider.setBounds(dbScale.getX(),
+                              leftMacroMeter.getTextHeight(),
+                              dbScale.getWidth(),
+                              leftMacroMeter.getMeterHeight());
 }
 
 void StereoMeter::update(float leftChannelDb, float rightChannelDb)
@@ -462,6 +521,7 @@ void StereoMeter::update(float leftChannelDb, float rightChannelDb)
 }
 
 //==============================================================================
+//MARK: - ReadAllAfterWriteCircularBuffer
 
 template<typename T>
 ReadAllAfterWriteCircularBuffer<T>::ReadAllAfterWriteCircularBuffer(T fillValue)
@@ -528,18 +588,28 @@ void ReadAllAfterWriteCircularBuffer<T>::resetWriteIndex()
 }
 
 //==============================================================================
+//MARK: - Histogram
 
-Histogram::Histogram(const juce::String& title_)
-    : title(title_)
+Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
+    : vt(_vt),
+      title(_title)
 {
+    vt.addListener(this);
+}
+
+void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_thresholdValue)
+    {
+        dbThreshold = _vt.getProperty(ID_thresholdValue);
+    }
 }
 
 void Histogram::paint(juce::Graphics &g)
 {
     juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
-    
     g.fillAll(juce::Colours::black);
-        
+
     displayPath(g, localBounds);
     
     g.setColour(juce::Colours::white);
@@ -570,7 +640,22 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
     
     if (!fillPath.isEmpty())
     {
-        g.setColour(juce::Colours::orange.withAlpha(0.5f));
+        histogramColourGradient.point1.setXY(bounds.getX(), bounds.getBottom());
+        histogramColourGradient.point2.setXY(bounds.getX(), bounds.getY());
+        
+        float dbThresholdMapped = juce::jmap(dbThreshold,
+                                             NEGATIVE_INFINITY, MAX_DECIBELS,
+                                             0.f, 1.f);
+    
+        juce::Colour belowThresholdColour = juce::Colours::orange.withAlpha(0.5f);
+        juce::Colour aboveThresholdColour = juce::Colours::red.withAlpha(0.5f);
+        histogramColourGradient.clearColours();
+        histogramColourGradient.addColour(0, belowThresholdColour);
+        histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
+        histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.f), aboveThresholdColour);
+        histogramColourGradient.addColour(1, aboveThresholdColour);
+        
+        g.setGradientFill(histogramColourGradient);
         g.fillPath(fillPath);
         
         g.setColour(juce::Colours::orange);
@@ -622,6 +707,7 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
 }
 
 //==============================================================================
+//MARK: - Goniometer
 
 Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
     : buffer(_buffer)
@@ -838,6 +924,7 @@ void Goniometer::paint(juce::Graphics &g)
 }
 
 //==============================================================================
+//MARK: - CorrelationMeter
 
 CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
     : buffer(_buffer)
@@ -957,11 +1044,15 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
 }
 
 //==============================================================================
+//MARK: - StereoImageMeter
 
-StereoImageMeter::StereoImageMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
-    : goniometer(_buffer),
+StereoImageMeter::StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>& _buffer, double _sampleRate)
+    : vt(_vt),
+      goniometer(_buffer),
       correlationMeter(_buffer, _sampleRate)
 {
+    vt.addListener(this);
+    
     addAndMakeVisible(goniometer);
     addAndMakeVisible(correlationMeter);
 }
@@ -988,29 +1079,43 @@ void StereoImageMeter::update()
 
 //==============================================================================
 //==============================================================================
+//MARK: - PFM10AudioProcessorEditor
+
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
+      valueTree(juce::Identifier("root")),
       editorAudioBuffer(2, 512),
-      peakStereoMeter(juce::String("Peak")),
-      peakHistogram(juce::String("Peak")),
-      stereoImageMeter(editorAudioBuffer, audioProcessor.getSampleRate())
+      peakStereoMeter(valueTree, juce::String("Peak")),
+      peakHistogram(valueTree, juce::String("Peak")),
+      stereoImageMeter(valueTree, editorAudioBuffer, audioProcessor.getSampleRate())
 {
-    addAndMakeVisible(peakStereoMeter);
-    addAndMakeVisible(peakHistogram);
-    addAndMakeVisible(stereoImageMeter);
-    
-    startTimerHz(refreshRateHz);
+    initValueTree();
     
     setSize (pluginWidth, pluginHeight);
     
 //    setResizable(false, false);
 //    setResizeLimits(600, 600,    //min
 //                    900, 900);  //max
+    
+    addAndMakeVisible(peakStereoMeter);
+    addAndMakeVisible(peakHistogram);
+    addAndMakeVisible(stereoImageMeter);
+    
+    startTimerHz(refreshRateHz);
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
 {
+}
+
+void PFM10AudioProcessorEditor::initValueTree()
+{
+    // Property Identifiers
+    static juce::Identifier thresholdValue ("thresholdValue");
+    
+    // Set Up Properties using Identifiers
+    valueTree.setProperty(thresholdValue, 0.f, nullptr);
 }
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
