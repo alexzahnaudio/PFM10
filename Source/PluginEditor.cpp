@@ -191,8 +191,8 @@ void TextMeter::paint(juce::Graphics &g)
     
     if (valueHolder.getIsOverThreshold())
     {
-        g.fillAll(juce::Colours::red);
-        textColor = juce::Colours::black;
+        g.fillAll(juce::Colours::black);
+        textColor = juce::Colours::red;
         
         valueToDisplay = valueHolder.getHeldValue();
     }
@@ -228,6 +228,12 @@ void TextMeter::update(float valueDb)
     cachedValueDb = valueDb;
     valueHolder.updateHeldValue(valueDb);
     repaint();
+}
+
+void TextMeter::setThreshold(float dbLevel)
+{
+    dbThreshold = dbLevel;
+    valueHolder.setThreshold(dbLevel);
 }
 
 //==============================================================================
@@ -330,6 +336,7 @@ void MacroMeter::updateLevel(float level)
 void MacroMeter::updateThreshold(float dbLevel)
 {
     peakMeter.setThreshold(dbLevel);
+    peakTextMeter.setThreshold(dbLevel);
     averageMeter.setThreshold(dbLevel);
 }
 
@@ -590,12 +597,19 @@ Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
     vt.addListener(this);
 }
 
+void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_thresholdValue)
+    {
+        dbThreshold = _vt.getProperty(ID_thresholdValue);
+    }
+}
+
 void Histogram::paint(juce::Graphics &g)
 {
     juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
-    
     g.fillAll(juce::Colours::black);
-        
+
     displayPath(g, localBounds);
     
     g.setColour(juce::Colours::white);
@@ -626,7 +640,22 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
     
     if (!fillPath.isEmpty())
     {
-        g.setColour(juce::Colours::orange.withAlpha(0.5f));
+        histogramColourGradient.point1.setXY(bounds.getX(), bounds.getBottom());
+        histogramColourGradient.point2.setXY(bounds.getX(), bounds.getY());
+        
+        float dbThresholdMapped = juce::jmap(dbThreshold,
+                                             NEGATIVE_INFINITY, MAX_DECIBELS,
+                                             0.f, 1.f);
+    
+        juce::Colour belowThresholdColour = juce::Colours::orange.withAlpha(0.5f);
+        juce::Colour aboveThresholdColour = juce::Colours::red.withAlpha(0.5f);
+        histogramColourGradient.clearColours();
+        histogramColourGradient.addColour(0, belowThresholdColour);
+        histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
+        histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.f), aboveThresholdColour);
+        histogramColourGradient.addColour(1, aboveThresholdColour);
+        
+        g.setGradientFill(histogramColourGradient);
         g.fillPath(fillPath);
         
         g.setColour(juce::Colours::orange);

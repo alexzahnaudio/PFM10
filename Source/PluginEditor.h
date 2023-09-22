@@ -143,9 +143,11 @@ struct TextMeter : juce::Component
     TextMeter();
     void paint(juce::Graphics& g) override;
     void update(float valueDb);
+    void setThreshold(float dbLevel);
 private:
     float cachedValueDb;
     ValueHolder valueHolder;
+    float dbThreshold { 0 };
 };
 
 //MARK: - Meter
@@ -213,7 +215,6 @@ private:
     // Value Tree
     juce::ValueTree vt;
     juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
-    
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
 
     // Look and Feel
@@ -261,9 +262,12 @@ private:
     // Value Tree
     juce::ValueTree vt;
     juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     ReadAllAfterWriteCircularBuffer<float> buffer {float(NEGATIVE_INFINITY)};
     juce::Path path;
+    float dbThreshold { 0 };
+    juce::ColourGradient histogramColourGradient;
     const juce::String title;
     
     void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
