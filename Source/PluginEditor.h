@@ -29,6 +29,8 @@
 //==============================================================================
 // Look And Feel classes
 //==============================================================================
+//MARK: - LAF_ThresholdSlider
+
 struct LAF_ThresholdSlider : juce::LookAndFeel_V4
 {
     LAF_ThresholdSlider()
@@ -67,6 +69,7 @@ private:
 //==============================================================================
 // JUCE Components and custom classes
 //==============================================================================
+//MARK: - Averager
 
 template<typename T>
 struct Averager
@@ -89,6 +92,8 @@ private:
     std::atomic<T> sum { 0 };
 };
 
+//MARK: - DecayingValueHolder
+
 struct DecayingValueHolder : juce::Timer
 {
     DecayingValueHolder();
@@ -108,6 +113,8 @@ private:
     static juce::int64 getNow();
     void resetDecayRateMultiplier() { decayRateMultiplier = 1; }
 };
+
+//MARK: - ValueHolder
 
 struct ValueHolder : juce::Timer
 {
@@ -129,6 +136,8 @@ private:
     bool isOverThreshold { false };
 };
 
+//MARK: - TextMeter
+
 struct TextMeter : juce::Component
 {
     TextMeter();
@@ -138,6 +147,8 @@ private:
     float cachedValueDb;
     ValueHolder valueHolder;
 };
+
+//MARK: - Meter
 
 struct Meter : juce::Component
 {
@@ -149,6 +160,8 @@ private:
     float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
 };
+
+//MARK: - MacroMeter
 
 struct MacroMeter : juce::Component
 {
@@ -168,11 +181,15 @@ private:
     Averager<float> averager;
 };
 
+//MARK: - Tick
+
 struct Tick
 {
     float db { 0.f };
     int y { 0 };
 };
+
+//MARK: - DbScale
 
 struct DbScale : juce::Component
 {
@@ -183,6 +200,8 @@ struct DbScale : juce::Component
 private:
     juce::Image bkgd;
 };
+
+//MARK: - StereoMeter
 
 struct StereoMeter : juce::Component, juce::ValueTree::Listener
 {
@@ -207,6 +226,8 @@ private:
     juce::Slider thresholdSlider;
 };
 
+//MARK: - ReadAllAfterWriteCircularBuffer
+
 template<typename T>
 struct ReadAllAfterWriteCircularBuffer
 {
@@ -226,15 +247,21 @@ private:
     void resetWriteIndex();
 };
 
-struct Histogram : juce::Component
+//MARK: - Histogram
+
+struct Histogram : juce::Component, juce::ValueTree::Listener
 {
-    Histogram(const juce::String& title_);
+    Histogram(juce::ValueTree _vt, const juce::String& _title);
     
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
     void update(float value);
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    
     ReadAllAfterWriteCircularBuffer<float> buffer {float(NEGATIVE_INFINITY)};
     juce::Path path;
     const juce::String title;
@@ -244,6 +271,8 @@ private:
                           ReadAllAfterWriteCircularBuffer<float>& buffer,
                           juce::Rectangle<float> bounds);
 };
+
+//MARK: - Goniometer
 
 struct Goniometer : juce::Component
 {
@@ -261,6 +290,8 @@ private:
 
     void buildBackground(juce::Graphics& g);
 };
+
+//MARK: - CorrelationMeter
 
 struct CorrelationMeter : juce::Component
 {
@@ -281,19 +312,25 @@ private:
                      bool drawBorder);
 };
 
-struct StereoImageMeter : juce::Component
+//MARK: - StereoImageMeter
+
+struct StereoImageMeter : juce::Component, juce::ValueTree::Listener
 {
-    StereoImageMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
+    StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>& _buffer, double _sampleRate);
     void resized() override;
     void update();
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    
     Goniometer goniometer;
     CorrelationMeter correlationMeter;
 };
 
 //==============================================================================
-/**
-*/
+//MARK: - PFM10AudioProcessorEditor
+
 class PFM10AudioProcessorEditor  : public juce::AudioProcessorEditor, juce::Timer
 {
 public:

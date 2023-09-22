@@ -13,6 +13,7 @@
 // JUCE Components and custom classes
 //==============================================================================
 
+//MARK: - Averager
 template<typename T>
 Averager<T>::Averager(size_t numElements, T initialValue)
 {
@@ -64,6 +65,7 @@ void Averager<T>::add(T t)
 }
 
 //==============================================================================
+//MARK: - DecayingValueHolder
 
 DecayingValueHolder::DecayingValueHolder()
 {
@@ -126,6 +128,7 @@ juce::int64 DecayingValueHolder::getNow()
 }
 
 //==============================================================================
+//MARK: - ValueHolder
 
 ValueHolder::ValueHolder()
 {
@@ -173,6 +176,7 @@ void ValueHolder::updateHeldValue(float v)
 }
 
 //==============================================================================
+//MARK: - TextMeter
 
 TextMeter::TextMeter()
 {
@@ -227,6 +231,7 @@ void TextMeter::update(float valueDb)
 }
 
 //==============================================================================
+//MARK: - Meter
 
 void Meter::paint(juce::Graphics& g)
 {
@@ -278,6 +283,7 @@ void Meter::update(float dbLevel)
 }
 
 //==============================================================================
+//MARK: - MacroMeter
 
 MacroMeter::MacroMeter()
 : averager(30, 0)
@@ -328,6 +334,7 @@ void MacroMeter::updateThreshold(float dbLevel)
 }
 
 //==============================================================================
+//MARK: - DbScale
 
 void DbScale::paint(juce::Graphics &g)
 {
@@ -425,6 +432,7 @@ void DbScale::buildBackgroundImage(int dbDivision,
 }
 
 //==============================================================================
+//MARK: - StereoMeter
 
 StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     : vt(_vt)
@@ -506,6 +514,7 @@ void StereoMeter::update(float leftChannelDb, float rightChannelDb)
 }
 
 //==============================================================================
+//MARK: - ReadAllAfterWriteCircularBuffer
 
 template<typename T>
 ReadAllAfterWriteCircularBuffer<T>::ReadAllAfterWriteCircularBuffer(T fillValue)
@@ -572,10 +581,13 @@ void ReadAllAfterWriteCircularBuffer<T>::resetWriteIndex()
 }
 
 //==============================================================================
+//MARK: - Histogram
 
-Histogram::Histogram(const juce::String& title_)
-    : title(title_)
+Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
+    : vt(_vt),
+      title(_title)
 {
+    vt.addListener(this);
 }
 
 void Histogram::paint(juce::Graphics &g)
@@ -666,6 +678,7 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
 }
 
 //==============================================================================
+//MARK: - Goniometer
 
 Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
     : buffer(_buffer)
@@ -882,6 +895,7 @@ void Goniometer::paint(juce::Graphics &g)
 }
 
 //==============================================================================
+//MARK: - CorrelationMeter
 
 CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
     : buffer(_buffer)
@@ -1001,11 +1015,15 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
 }
 
 //==============================================================================
+//MARK: - StereoImageMeter
 
-StereoImageMeter::StereoImageMeter(juce::AudioBuffer<float>& _buffer, double _sampleRate)
-    : goniometer(_buffer),
+StereoImageMeter::StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>& _buffer, double _sampleRate)
+    : vt(_vt),
+      goniometer(_buffer),
       correlationMeter(_buffer, _sampleRate)
 {
+    vt.addListener(this);
+    
     addAndMakeVisible(goniometer);
     addAndMakeVisible(correlationMeter);
 }
@@ -1032,14 +1050,16 @@ void StereoImageMeter::update()
 
 //==============================================================================
 //==============================================================================
+//MARK: - PFM10AudioProcessorEditor
+
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
       valueTree(juce::Identifier("root")),
       editorAudioBuffer(2, 512),
       peakStereoMeter(valueTree, juce::String("Peak")),
-      peakHistogram(juce::String("Peak")),
-      stereoImageMeter(editorAudioBuffer, audioProcessor.getSampleRate())
+      peakHistogram(valueTree, juce::String("Peak")),
+      stereoImageMeter(valueTree, editorAudioBuffer, audioProcessor.getSampleRate())
 {
     initValueTree();
     
