@@ -67,12 +67,22 @@ void Averager<T>::add(T t)
 //==============================================================================
 //MARK: - DecayingValueHolder
 
-DecayingValueHolder::DecayingValueHolder()
+DecayingValueHolder::DecayingValueHolder(juce::ValueTree _vt)
+: vt(_vt)
 {
-    // default starting decay rate 0.1 db/frame
-    decayRatePerFrame = 0.1f;
+    vt.addListener(this);
     
     startTimerHz(60);
+}
+
+void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_decayRate)
+    {
+        float decayRate = _vt.getProperty(ID_decayRate);
+        
+        setDecayRate(decayRate);
+    }
 }
 
 void DecayingValueHolder::updateHeldValue(float input)
@@ -98,7 +108,7 @@ void DecayingValueHolder::setHoldTime(int ms)
 void DecayingValueHolder::setDecayRate(float dbPerSec)
 {
     // note: getTimerInterval() returns milliseconds
-    decayRatePerFrame = dbPerSec * (getTimerInterval() / 1000);
+    decayRatePerFrame = dbPerSec * getTimerInterval() / 1000;
 }
 
 void DecayingValueHolder::timerCallback()
@@ -113,7 +123,7 @@ void DecayingValueHolder::timerCallback()
                                  MAX_DECIBELS,
                                  heldValue);
         
-        decayRateMultiplier += 2;
+        //decayRateMultiplier += 2;
         
         if (heldValue <= NEGATIVE_INFINITY)
         {
@@ -239,6 +249,11 @@ void TextMeter::setThreshold(float dbLevel)
 //==============================================================================
 //MARK: - Meter
 
+Meter::Meter(juce::ValueTree _vt)
+: decayingValueHolder(_vt)
+{
+}
+
 void Meter::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
@@ -291,8 +306,10 @@ void Meter::update(float dbLevel)
 //==============================================================================
 //MARK: - MacroMeter
 
-MacroMeter::MacroMeter()
-: averager(30, 0)
+MacroMeter::MacroMeter(juce::ValueTree _vt)
+: peakMeter(_vt),
+  averageMeter(_vt),
+  averager(30, 0)
 {
     addAndMakeVisible(peakTextMeter);
     addAndMakeVisible(peakMeter);
@@ -442,7 +459,9 @@ void DbScale::buildBackgroundImage(int dbDivision,
 //MARK: - StereoMeter
 
 StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
-    : vt(_vt)
+    : vt(_vt),
+      leftMacroMeter(_vt),
+      rightMacroMeter(_vt)
 {
     vt.addListener(this);
     
@@ -1094,13 +1113,15 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     
     setSize (pluginWidth, pluginHeight);
     
-//    setResizable(false, false);
-//    setResizeLimits(600, 600,    //min
-//                    900, 900);  //max
+    //setResizable(true, true);
+    //setResizeLimits(600, 600,    //min
+    //                900, 900);  //max
     
     addAndMakeVisible(peakStereoMeter);
     addAndMakeVisible(peakHistogram);
     addAndMakeVisible(stereoImageMeter);
+    
+    initMenus();
     
     startTimerHz(refreshRateHz);
 }
@@ -1113,9 +1134,37 @@ void PFM10AudioProcessorEditor::initValueTree()
 {
     // Property Identifiers
     static juce::Identifier thresholdValue ("thresholdValue");
+    static juce::Identifier decayRate ("decayRate");
     
     // Set Up Properties using Identifiers
     valueTree.setProperty(thresholdValue, 0.f, nullptr);
+    valueTree.setProperty(decayRate, 0.f, nullptr);
+}
+
+void PFM10AudioProcessorEditor::initMenus()
+{
+    decayRateMenu.addItem("-3dB/s",  DB_PER_SEC_3);
+    decayRateMenu.addItem("-6dB/s",  DB_PER_SEC_6);
+    decayRateMenu.addItem("-12dB/s", DB_PER_SEC_12);
+    decayRateMenu.addItem("-24dB/s", DB_PER_SEC_24);
+    decayRateMenu.addItem("-36dB/s", DB_PER_SEC_36);
+    decayRateMenu.setTooltip("Peak Marker Decay Rate");
+    decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
+    decayRateMenu.setSelectedId(1);
+    addAndMakeVisible(decayRateMenu);
+}
+
+void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
+{
+    switch (decayRateMenu.getSelectedId())
+    {
+        case DB_PER_SEC_3:  valueTree.setProperty("decayRate", 3.f,  nullptr); break;
+        case DB_PER_SEC_6:  valueTree.setProperty("decayRate", 6.f,  nullptr); break;
+        case DB_PER_SEC_12: valueTree.setProperty("decayRate", 12.f, nullptr); break;
+        case DB_PER_SEC_24: valueTree.setProperty("decayRate", 24.f, nullptr); break;
+        case DB_PER_SEC_36: valueTree.setProperty("decayRate", 36.f, nullptr); break;
+        default: break;
+    }
 }
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
@@ -1142,6 +1191,11 @@ void PFM10AudioProcessorEditor::resized()
                                0,
                                width - peakStereoMeter.getRight(),
                                height - peakHistogram.getHeight());
+    
+    decayRateMenu.setBounds(peakStereoMeter.getRight() + 10,
+                            0,
+                            50,
+                            20);
 }
 
 void PFM10AudioProcessorEditor::timerCallback()

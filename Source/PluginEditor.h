@@ -94,9 +94,9 @@ private:
 
 //MARK: - DecayingValueHolder
 
-struct DecayingValueHolder : juce::Timer
+struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
 {
-    DecayingValueHolder();
+    DecayingValueHolder(juce::ValueTree _vt);
     void updateHeldValue(float input);
     float getHeldValue() const { return heldValue; }
     bool isOverThreshold() const;
@@ -104,6 +104,11 @@ struct DecayingValueHolder : juce::Timer
     void setDecayRate(float dbPerSec);
     void timerCallback() override;
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_decayRate = juce::Identifier("decayRate");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
+    
     float heldValue { NEGATIVE_INFINITY };
     juce::int64 peakTime = getNow();
     float threshold = 0.f;
@@ -154,6 +159,7 @@ private:
 
 struct Meter : juce::Component
 {
+    Meter(juce::ValueTree _vt);
     void paint (juce::Graphics&) override;
     void update(float dbLevel);
     void setThreshold(float dbLevel) { dbThreshold = dbLevel; }
@@ -167,7 +173,7 @@ private:
 
 struct MacroMeter : juce::Component
 {
-    MacroMeter();
+    MacroMeter(juce::ValueTree _vt);
     void resized() override;
     void updateLevel(float level);
     void updateThreshold(float dbLevel);
@@ -362,6 +368,23 @@ private:
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
     
+    // Menus
+    enum DecayRates
+    {
+        DB_PER_SEC_3 = 1,
+        DB_PER_SEC_6,
+        DB_PER_SEC_12,
+        DB_PER_SEC_24,
+        DB_PER_SEC_36
+    };
+    juce::ComboBox decayRateMenu;
+    void onDecayRateMenuChanged();
+    
+    
+    
+    void initMenus();
+    
+    // Plugin window size and refresh rate
     int pluginWidth { 700 };
     int pluginHeight { 600 };
 
