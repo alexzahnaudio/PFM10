@@ -289,6 +289,7 @@ struct Goniometer : juce::Component
     Goniometer(juce::AudioBuffer<float>& buffer);
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void setScale(float newScale) { scale = newScale; }
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
@@ -297,6 +298,7 @@ private:
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
+    float scale { 1.f };
 
     void buildBackground(juce::Graphics& g);
 };
@@ -332,7 +334,8 @@ struct StereoImageMeter : juce::Component, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    juce::Identifier ID_goniometerScale = juce::Identifier("goniometerScale");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     Goniometer goniometer;
     CorrelationMeter correlationMeter;
@@ -380,7 +383,7 @@ private:
     juce::ComboBox decayRateMenu;
     void onDecayRateMenuChanged();
     
-    
+    juce::Slider goniometerScaleRotarySlider;
     
     void initMenus();
     

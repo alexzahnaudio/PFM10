@@ -876,8 +876,8 @@ void Goniometer::paint(juce::Graphics &g)
     
     for (int i = 0; i < numSamples; ++i)
     {
-        leftSample = internalBuffer.getSample(0, i);
-        rightSample = internalBuffer.getSample(1, i);
+        leftSample = internalBuffer.getSample(0, i) * scale;
+        rightSample = internalBuffer.getSample(1, i) * scale;
 
         //mult by invsqrt(2) gives us half power or -3dB
         mid = (leftSample + rightSample) * INV_SQRT_OF_2;
@@ -1076,6 +1076,14 @@ StereoImageMeter::StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>
     addAndMakeVisible(correlationMeter);
 }
 
+void StereoImageMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
+{
+    if (_ID == ID_goniometerScale)
+    {
+        goniometer.setScale( _vt.getProperty(ID_goniometerScale) );
+    }
+}
+
 void StereoImageMeter::resized()
 {
     float gonioToCorrMeterHeightRatio = 0.9f;
@@ -1135,10 +1143,12 @@ void PFM10AudioProcessorEditor::initValueTree()
     // Property Identifiers
     static juce::Identifier thresholdValue ("thresholdValue");
     static juce::Identifier decayRate ("decayRate");
+    static juce::Identifier goniometerScale ("goniometerScale");
     
     // Set Up Properties using Identifiers
     valueTree.setProperty(thresholdValue, 0.f, nullptr);
     valueTree.setProperty(decayRate, 0.f, nullptr);
+    valueTree.setProperty(goniometerScale, 0.f, nullptr);
 }
 
 void PFM10AudioProcessorEditor::initMenus()
@@ -1152,6 +1162,21 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
     decayRateMenu.setSelectedId(1);
     addAndMakeVisible(decayRateMenu);
+    
+    goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    goniometerScaleRotarySlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 20);
+    goniometerScaleRotarySlider.textFromValueFunction = [](double value)
+    {
+        return juce::String( juce::roundToInt(value * 100) ) + "%";
+    };
+    goniometerScaleRotarySlider.setTooltip("Goniometer Scale");
+    goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
+    goniometerScaleRotarySlider.onValueChange = [this]
+    {
+        valueTree.setProperty("goniometerScale", goniometerScaleRotarySlider.getValue(), nullptr);
+    };
+    goniometerScaleRotarySlider.setValue(1);
+    addAndMakeVisible(goniometerScaleRotarySlider);
 }
 
 void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
@@ -1192,10 +1217,17 @@ void PFM10AudioProcessorEditor::resized()
                                width - peakStereoMeter.getRight(),
                                height - peakHistogram.getHeight());
     
+    // Menus
     decayRateMenu.setBounds(peakStereoMeter.getRight() + 10,
                             0,
                             50,
                             20);
+    
+    int goniometerScaleRotarySliderSize = 75;
+    goniometerScaleRotarySlider.setBounds(stereoImageMeter.getRight() - goniometerScaleRotarySliderSize,
+                                          stereoImageMeter.getY(),
+                                          goniometerScaleRotarySliderSize,
+                                          goniometerScaleRotarySliderSize);
 }
 
 void PFM10AudioProcessorEditor::timerCallback()
