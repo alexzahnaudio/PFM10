@@ -10,6 +10,36 @@
 #include "PluginEditor.h"
 
 //==============================================================================
+// Look And Feel classes
+//==============================================================================
+//MARK: - LAF_ThresholdSlider
+
+void LAF_ThresholdSlider::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                                           float sliderPos,
+                                           float minSliderPos,
+                                           float maxSliderPos,
+                                           const juce::Slider::SliderStyle style,
+                                           juce::Slider& slider)
+{
+    // This Look-And-Feel class is designed specifically for linear-bar style sliders!
+    //
+    // If you intend to expand this to handle other slider styles, then change this jassert
+    // to an if(slider.isBar()) condition and add an else block (see default LAF_V4 implementation),
+    // or create a different custom LAF class.
+    jassert (slider.isBar());
+
+    g.setColour (slider.findColour (juce::Slider::thumbColourId));
+    g.fillRect (slider.isHorizontal() ? juce::Rectangle<float> (sliderPos - thumbWidth,
+                                                                (float) y + 0.5f,
+                                                                thumbWidth,
+                                                                (float) height - 1.0f)
+                                      : juce::Rectangle<float> ((float) x + 0.5f,
+                                                                sliderPos,
+                                                                (float) width - 1.0f,
+                                                                thumbWidth));
+}
+
+//==============================================================================
 // JUCE Components and custom classes
 //==============================================================================
 
