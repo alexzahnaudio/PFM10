@@ -57,7 +57,7 @@ private:
 template<typename T>
 struct Averager
 {
-    Averager(size_t numElements, T initialValue);
+    Averager(size_t _numElements, T _initialValue);
     
     void resize(size_t numElements, T initialValue);
     
@@ -70,9 +70,9 @@ struct Averager
     float getAvg() const { return avg; }
 private:
     std::vector<T> elements;
-    std::atomic<float> avg { static_cast<float>(T()) };
+    std::atomic<float> avg { NEGATIVE_INFINITY };
     std::atomic<size_t> writeIndex = 0;
-    std::atomic<T> sum { 0 };
+    std::atomic<T> sum { NEGATIVE_INFINITY };
 };
 
 //MARK: - DecayingValueHolder
@@ -160,6 +160,7 @@ struct MacroMeter : juce::Component
     void resized() override;
     void updateLevel(float level);
     void updateThreshold(float dbLevel);
+    void setAveragerIntervals(int numElements);
     //==============================================================================
     int getTextHeight() const { return textHeight; }
     int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
@@ -203,7 +204,8 @@ struct StereoMeter : juce::Component, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    juce::Identifier ID_thresholdValue    = juce::Identifier("thresholdValue");
+    juce::Identifier ID_averagerIntervals = juce::Identifier("averagerIntervals");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
 
     // Look and Feel
@@ -354,7 +356,9 @@ private:
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
     
+    //==============================================================================
     // Menus
+    
     enum DecayRates
     {
         DB_PER_SEC_3 = 1,
@@ -366,11 +370,24 @@ private:
     juce::ComboBox decayRateMenu;
     void onDecayRateMenuChanged();
     
+    enum AveragerDurations
+    {
+        AVERAGER_DURATION_MS_100 = 1,
+        AVERAGER_DURATION_MS_250,
+        AVERAGER_DURATION_MS_500,
+        AVERAGER_DURATION_MS_1000,
+        AVERAGER_DURATION_MS_2000
+    };
+    int durationMsToIntervals(int durationMs, int refreshRate) { return durationMs * refreshRate / 1000; }
+    juce::ComboBox averagerDurationMenu;
+    void onAveragerDurationChanged();
+    
     juce::Slider goniometerScaleRotarySlider;
     
     void initMenus();
     
-    // Plugin window size and refresh rate
+    //==============================================================================
+    
     int pluginWidth { 700 };
     int pluginHeight { 600 };
 

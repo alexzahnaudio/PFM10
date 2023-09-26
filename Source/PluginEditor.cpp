@@ -45,9 +45,9 @@ void LAF_ThresholdSlider::drawLinearSlider(juce::Graphics& g, int x, int y, int 
 
 //MARK: - Averager
 template<typename T>
-Averager<T>::Averager(size_t numElements, T initialValue)
+Averager<T>::Averager(size_t _numElements, T _initialValue)
 {
-    resize(numElements, initialValue);
+    resize(_numElements, _initialValue);
 }
 
 template<typename T>
@@ -60,14 +60,15 @@ void Averager<T>::resize(size_t numElements, T initialValue)
 template<typename T>
 void Averager<T>::clear(T initialValue)
 {
-    for (T element : elements)
+    int numElements = static_cast<int>(elements.size());
+    for (int i = 0; i < numElements; i++)
     {
-        element = initialValue;
+        elements[i] = initialValue;
     }
     
     writeIndex = 0;
-    avg = 0.f;
-    sum = static_cast<T>(0);
+    avg = initialValue;
+    sum = static_cast<T>(initialValue * numElements);
     
 }
 
@@ -387,6 +388,11 @@ void MacroMeter::updateThreshold(float dbLevel)
     averageMeter.setThreshold(dbLevel);
 }
 
+void MacroMeter::setAveragerIntervals(int numElements)
+{
+    averager.resize(size_t(numElements), averager.getAvg());
+}
+
 //==============================================================================
 //MARK: - DbScale
 
@@ -526,6 +532,13 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.updateThreshold(dbLevel);
         rightMacroMeter.updateThreshold(dbLevel);
+    }
+    else if (_ID == ID_averagerIntervals)
+    {
+        int newNumAveragerIntervals = _vt.getProperty(ID_averagerIntervals);
+        
+        leftMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
+        rightMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
     }
 }
 
@@ -1171,14 +1184,16 @@ PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
 void PFM10AudioProcessorEditor::initValueTree()
 {
     // Property Identifiers
-    static juce::Identifier thresholdValue ("thresholdValue");
-    static juce::Identifier decayRate ("decayRate");
-    static juce::Identifier goniometerScale ("goniometerScale");
+    static juce::Identifier thresholdValue       ("thresholdValue");
+    static juce::Identifier decayRate            ("decayRate");
+    static juce::Identifier averagerIntervals    ("averagerIntervals");
+    static juce::Identifier goniometerScale      ("goniometerScale");
     
     // Set Up Properties using Identifiers
-    valueTree.setProperty(thresholdValue, 0.f, nullptr);
-    valueTree.setProperty(decayRate, 0.f, nullptr);
-    valueTree.setProperty(goniometerScale, 0.f, nullptr);
+    valueTree.setProperty(thresholdValue,    0.f, nullptr);
+    valueTree.setProperty(decayRate,         0.f, nullptr);
+    valueTree.setProperty(averagerIntervals, 0,   nullptr);
+    valueTree.setProperty(goniometerScale,   0.f, nullptr);
 }
 
 void PFM10AudioProcessorEditor::initMenus()
@@ -1190,8 +1205,18 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.addItem("-36dB/s", DB_PER_SEC_36);
     decayRateMenu.setTooltip("Peak Marker Decay Rate");
     decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
-    decayRateMenu.setSelectedId(1);
+    decayRateMenu.setSelectedId(DB_PER_SEC_12);
     addAndMakeVisible(decayRateMenu);
+    
+    averagerDurationMenu.addItem("100ms",  AVERAGER_DURATION_MS_100);
+    averagerDurationMenu.addItem("250ms",  AVERAGER_DURATION_MS_250);
+    averagerDurationMenu.addItem("500ms",  AVERAGER_DURATION_MS_500);
+    averagerDurationMenu.addItem("1000ms", AVERAGER_DURATION_MS_1000);
+    averagerDurationMenu.addItem("2000ms", AVERAGER_DURATION_MS_2000);
+    averagerDurationMenu.setTooltip("Averaging duration for RMS meters");
+    averagerDurationMenu.onChange = [this] { onAveragerDurationChanged(); };
+    averagerDurationMenu.setSelectedId(AVERAGER_DURATION_MS_100);
+    addAndMakeVisible(averagerDurationMenu);
     
     goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     goniometerScaleRotarySlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 20);
@@ -1205,7 +1230,7 @@ void PFM10AudioProcessorEditor::initMenus()
     {
         valueTree.setProperty("goniometerScale", goniometerScaleRotarySlider.getValue(), nullptr);
     };
-    goniometerScaleRotarySlider.setValue(1);
+    goniometerScaleRotarySlider.setValue(1.f);
     addAndMakeVisible(goniometerScaleRotarySlider);
 }
 
@@ -1218,6 +1243,24 @@ void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
         case DB_PER_SEC_12: valueTree.setProperty("decayRate", 12.f, nullptr); break;
         case DB_PER_SEC_24: valueTree.setProperty("decayRate", 24.f, nullptr); break;
         case DB_PER_SEC_36: valueTree.setProperty("decayRate", 36.f, nullptr); break;
+        default: break;
+    }
+}
+
+void PFM10AudioProcessorEditor::onAveragerDurationChanged()
+{
+    switch (averagerDurationMenu.getSelectedId())
+    {
+        case AVERAGER_DURATION_MS_100:
+            valueTree.setProperty("averagerIntervals", durationMsToIntervals(100,  refreshRateHz), nullptr); break;
+        case AVERAGER_DURATION_MS_250:
+            valueTree.setProperty("averagerIntervals", durationMsToIntervals(250,  refreshRateHz), nullptr); break;
+        case AVERAGER_DURATION_MS_500:
+            valueTree.setProperty("averagerIntervals", durationMsToIntervals(500,  refreshRateHz), nullptr); break;
+        case AVERAGER_DURATION_MS_1000:
+            valueTree.setProperty("averagerIntervals", durationMsToIntervals(1000, refreshRateHz), nullptr); break;
+        case AVERAGER_DURATION_MS_2000:
+            valueTree.setProperty("averagerIntervals", durationMsToIntervals(2000, refreshRateHz), nullptr); break;
         default: break;
     }
 }
@@ -1252,6 +1295,11 @@ void PFM10AudioProcessorEditor::resized()
                             0,
                             50,
                             20);
+    
+    averagerDurationMenu.setBounds(decayRateMenu.getX(),
+                                   decayRateMenu.getBottom() + 20,
+                                   50,
+                                   20);
     
     int goniometerScaleRotarySliderSize = 75;
     goniometerScaleRotarySlider.setBounds(stereoImageMeter.getRight() - goniometerScaleRotarySliderSize,
