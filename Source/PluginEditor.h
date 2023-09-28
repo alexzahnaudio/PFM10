@@ -80,6 +80,7 @@ private:
 struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
 {
     DecayingValueHolder(juce::ValueTree _vt);
+    ~DecayingValueHolder() override;
     void updateHeldValue(float input);
     float getHeldValue() const { return heldValue; }
     bool isOverThreshold() const;
@@ -89,13 +90,16 @@ struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_decayRate = juce::Identifier("decayRate");
+    juce::Identifier ID_decayRate        = juce::Identifier("decayRate");
+    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
+    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
+    bool holdForInf  { false };
     float heldValue { NEGATIVE_INFINITY };
+    juce::int64 holdTimeMs = 2000; //2 seconds
     juce::int64 peakTime = getNow();
     float threshold = 0.f;
-    juce::int64 holdTime = 2000; //2 seconds
     float decayRatePerFrame { 0 };
     float decayRateMultiplier { 1 };
     static juce::int64 getNow();
@@ -104,23 +108,32 @@ private:
 
 //MARK: - ValueHolder
 
-struct ValueHolder : juce::Timer
+struct ValueHolder : juce::Timer, juce::ValueTree::Listener
 {
-    ValueHolder();
+    ValueHolder(juce::ValueTree _vt);
     ~ValueHolder() override;
-    void timerCallback() override;
     void setThreshold(float th);
     void updateHeldValue(float v);
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
     float getCurrentValue() const { return currentValue; }
     float getHeldValue() const { return heldValue; }
     bool getIsOverThreshold() const { return isOverThreshold; }
+    void timerCallback() override;
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_peakHoldEnabled  = juce::Identifier("peakHoldEnabled");
+    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
+    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
+    
+    bool holdEnabled { true };
+    bool holdForInf  { false };
+    int durationToHoldForMs { 500 };
     float threshold = 0;
     float currentValue = NEGATIVE_INFINITY;
     float heldValue = NEGATIVE_INFINITY;
     juce::int64 timeOfPeak;
-    int durationToHoldForMs { 500 };
     bool isOverThreshold { false };
 };
 
@@ -128,7 +141,7 @@ private:
 
 struct TextMeter : juce::Component
 {
-    TextMeter();
+    TextMeter(juce::ValueTree _vt);
     void paint(juce::Graphics& g) override;
     void update(float valueDb);
     void setThreshold(float dbLevel);
@@ -146,7 +159,9 @@ struct Meter : juce::Component
     void paint (juce::Graphics&) override;
     void update(float dbLevel);
     void setThreshold(float dbLevel) { dbThreshold = dbLevel; }
+    void setPeakHoldEnabled(bool isEnabled) { peakHoldEnabled = isEnabled; }
 private:
+    bool peakHoldEnabled { true };
     float dbPeak { NEGATIVE_INFINITY };
     float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
@@ -161,6 +176,7 @@ struct MacroMeter : juce::Component
     void updateLevel(float level);
     void updateThreshold(float dbLevel);
     void setAveragerIntervals(int numElements);
+    void setPeakHoldEnabled(bool isEnabled);
     //==============================================================================
     int getTextHeight() const { return textHeight; }
     int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
@@ -206,6 +222,7 @@ private:
     juce::ValueTree vt;
     juce::Identifier ID_thresholdValue    = juce::Identifier("thresholdValue");
     juce::Identifier ID_averagerIntervals = juce::Identifier("averagerIntervals");
+    juce::Identifier ID_peakHoldEnabled   = juce::Identifier("peakHoldEnabled");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
 
     // Look and Feel
@@ -381,6 +398,18 @@ private:
     int durationMsToIntervals(int durationMs, int refreshRate) { return durationMs * refreshRate / 1000; }
     juce::ComboBox averagerDurationMenu;
     void onAveragerDurationChanged();
+    
+    enum PeakHoldDurations
+    {
+        PEAK_HOLD_DURATION_MS_0 = 1,
+        PEAK_HOLD_DURATION_MS_500,
+        PEAK_HOLD_DURATION_MS_2000,
+        PEAK_HOLD_DURATION_MS_4000,
+        PEAK_HOLD_DURATION_MS_6000,
+        PEAK_HOLD_DURATION_MS_INF
+    };
+    juce::ComboBox peakHoldDurationMenu;
+    void onPeakHoldDurationChanged();
     
     juce::Slider goniometerScaleRotarySlider;
     
