@@ -115,6 +115,8 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     void setThreshold(float th);
     void updateHeldValue(float v);
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
+    void setHoldEnabled(bool b) { holdEnabled = b; }
+    void setHoldForInf(bool b) { holdForInf = b; }
     float getCurrentValue() const { return currentValue; }
     float getHeldValue() const { return heldValue; }
     bool getIsOverThreshold() const { return isOverThreshold; }

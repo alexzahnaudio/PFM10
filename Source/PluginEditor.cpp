@@ -213,6 +213,23 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         setHoldDuration(newHoldDurationMs);
     }
+    else if (_ID == ID_peakHoldEnabled)
+    {
+        bool b = _vt.getProperty(ID_peakHoldEnabled);
+        
+        setHoldEnabled(b);
+        
+        if (!b)
+        {
+            setHoldDuration(0);
+        }
+    }
+    else if (_ID == ID_peakHoldInf)
+    {
+        bool b = _vt.getProperty(ID_peakHoldInf);
+        
+        setHoldForInf(b);
+    }
 }
 
 void ValueHolder::timerCallback()
@@ -220,33 +237,29 @@ void ValueHolder::timerCallback()
     juce::int64 now = juce::Time::currentTimeMillis();
     juce::int64 elapsed = now - timeOfPeak;
     
-    if (elapsed > durationToHoldForMs)
+    if (!holdForInf && elapsed > durationToHoldForMs)
     {
-        isOverThreshold = (currentValue > threshold);
-        heldValue = NEGATIVE_INFINITY;
+        heldValue = currentValue;
+        isOverThreshold = (heldValue > threshold);
     }
 }
 
 void ValueHolder::setThreshold(float th)
 {
     threshold = th;
-    isOverThreshold = (currentValue > threshold);
+    isOverThreshold = (heldValue > threshold);
 }
 
 void ValueHolder::updateHeldValue(float v)
 {
-    if (v > threshold)
-    {
-        isOverThreshold = true;
-        timeOfPeak = juce::Time::currentTimeMillis();
-        
-        if (v > heldValue)
-        {
-            heldValue = v;
-        }
-    }
-    
     currentValue = v;
+    
+    if (v > heldValue)
+    {
+        timeOfPeak = juce::Time::currentTimeMillis();
+        heldValue = v;
+        isOverThreshold = (heldValue > threshold);
+    }
 }
 
 //==============================================================================
@@ -261,35 +274,20 @@ TextMeter::TextMeter(juce::ValueTree _vt)
 
 void TextMeter::paint(juce::Graphics &g)
 {
-    juce::Colour textColor;
-    float valueToDisplay;
-    
-    if (valueHolder.getIsOverThreshold())
-    {
-        g.fillAll(juce::Colours::black);
-        textColor = juce::Colours::red;
-        
-        valueToDisplay = valueHolder.getHeldValue();
-    }
-    else
-    {
-        g.fillAll(juce::Colours::black);
-        textColor = juce::Colours::white;
-
-        valueToDisplay = valueHolder.getCurrentValue();
-    }
+    juce::Colour textColor = valueHolder.getIsOverThreshold() ? juce::Colours::red : juce::Colours::white;
+    float valueToDisplay = valueHolder.getHeldValue();
     
     juce::String textToDisplay;
     if (valueToDisplay > NEGATIVE_INFINITY)
     {
-        textToDisplay = juce::String(valueToDisplay, 1);
-        textToDisplay = textToDisplay.trimEnd();
+        textToDisplay = juce::String(valueToDisplay, 1).trimEnd();
     }
     else
     {
         textToDisplay = juce::String("-inf");
     }
     
+    g.fillAll(juce::Colours::black);
     g.setColour(textColor);
     g.setFont(12.f);
     g.drawFittedText(textToDisplay,
