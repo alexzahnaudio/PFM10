@@ -143,6 +143,11 @@ void DecayingValueHolder::updateHeldValue(float input)
     }
 }
 
+void DecayingValueHolder::resetHeldValue()
+{
+    heldValue = NEGATIVE_INFINITY;
+}
+
 bool DecayingValueHolder::isOverThreshold() const
 {
     return (heldValue > threshold);
@@ -262,6 +267,11 @@ void ValueHolder::updateHeldValue(float v)
     }
 }
 
+void ValueHolder::resetHeldValue()
+{
+    heldValue = NEGATIVE_INFINITY;
+}
+
 //==============================================================================
 //MARK: - TextMeter
 
@@ -307,6 +317,11 @@ void TextMeter::setThreshold(float dbLevel)
 {
     dbThreshold = dbLevel;
     valueHolder.setThreshold(dbLevel);
+}
+
+void TextMeter::resetHold()
+{
+    valueHolder.resetHeldValue();
 }
 
 //==============================================================================
@@ -366,6 +381,11 @@ void Meter::update(float dbLevel)
         decayingValueHolder.updateHeldValue(dbPeak);
     }
     repaint();
+}
+
+void Meter::resetHold()
+{
+    decayingValueHolder.resetHeldValue();
 }
 
 //==============================================================================
@@ -432,6 +452,13 @@ void MacroMeter::setPeakHoldEnabled(bool isEnabled)
 {
     peakMeter.setPeakHoldEnabled(isEnabled);
     averageMeter.setPeakHoldEnabled(isEnabled);
+}
+
+void MacroMeter::resetHold()
+{
+    peakTextMeter.resetHold();
+    peakMeter.resetHold();
+    averageMeter.resetHold();
 }
 
 //==============================================================================
@@ -588,6 +615,12 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         leftMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
         rightMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
     }
+}
+
+void StereoMeter::resetHold()
+{
+    leftMacroMeter.resetHold();
+    rightMacroMeter.resetHold();
 }
 
 void StereoMeter::resized()
@@ -1252,6 +1285,11 @@ void PFM10AudioProcessorEditor::initValueTree()
 
 void PFM10AudioProcessorEditor::initMenus()
 {
+    // Decay Rate Menu
+    
+    decayRateMenuLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(decayRateMenuLabel);
+    
     decayRateMenu.addItem("-3dB/s",  DB_PER_SEC_3);
     decayRateMenu.addItem("-6dB/s",  DB_PER_SEC_6);
     decayRateMenu.addItem("-12dB/s", DB_PER_SEC_12);
@@ -1262,6 +1300,11 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.setSelectedId(DB_PER_SEC_12);
     addAndMakeVisible(decayRateMenu);
     
+    // Averager Duration Menu
+    
+    averagerDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(averagerDurationMenuLabel);
+
     averagerDurationMenu.addItem("100ms",  AVERAGER_DURATION_MS_100);
     averagerDurationMenu.addItem("250ms",  AVERAGER_DURATION_MS_250);
     averagerDurationMenu.addItem("500ms",  AVERAGER_DURATION_MS_500);
@@ -1272,6 +1315,11 @@ void PFM10AudioProcessorEditor::initMenus()
     averagerDurationMenu.setSelectedId(AVERAGER_DURATION_MS_100);
     addAndMakeVisible(averagerDurationMenu);
     
+    // Peak Hold Duration Menu
+    
+    peakHoldDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(peakHoldDurationMenuLabel);
+
     peakHoldDurationMenu.addItem("0s",   PEAK_HOLD_DURATION_MS_0);
     peakHoldDurationMenu.addItem("0.5s", PEAK_HOLD_DURATION_MS_500);
     peakHoldDurationMenu.addItem("2s",   PEAK_HOLD_DURATION_MS_2000);
@@ -1283,6 +1331,17 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldDurationMenu.setSelectedId(PEAK_HOLD_DURATION_MS_500);
     addAndMakeVisible(peakHoldDurationMenu);
     
+    // Peak Hold Reset Button
+    
+    peakHoldResetButton.setButtonText("Reset Hold");
+    peakHoldResetButton.onClick = [this] { onPeakHoldResetClicked(); };
+    addAndMakeVisible(peakHoldResetButton);
+    
+    // Goniometer Scale Rotary Slider
+    
+    goniometerScaleRotarySliderLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(goniometerScaleRotarySliderLabel);
+
     goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
     goniometerScaleRotarySlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 20);
     goniometerScaleRotarySlider.textFromValueFunction = [](double value)
@@ -1303,8 +1362,8 @@ void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
 {
     switch (decayRateMenu.getSelectedId())
     {
-        case DB_PER_SEC_3:  valueTree.setProperty("decayRate", 3.f,  nullptr); break;
-        case DB_PER_SEC_6:  valueTree.setProperty("decayRate", 6.f,  nullptr); break;
+        case DB_PER_SEC_3:  valueTree.setProperty("decayRate",  3.f, nullptr); break;
+        case DB_PER_SEC_6:  valueTree.setProperty("decayRate",  6.f, nullptr); break;
         case DB_PER_SEC_12: valueTree.setProperty("decayRate", 12.f, nullptr); break;
         case DB_PER_SEC_24: valueTree.setProperty("decayRate", 24.f, nullptr); break;
         case DB_PER_SEC_36: valueTree.setProperty("decayRate", 36.f, nullptr); break;
@@ -1337,33 +1396,44 @@ void PFM10AudioProcessorEditor::onPeakHoldDurationChanged()
         case PEAK_HOLD_DURATION_MS_0:
             valueTree.setProperty("peakHoldEnabled",  false, nullptr);
             valueTree.setProperty("peakHoldInf",      false, nullptr);
+            peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_500:
             valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
             valueTree.setProperty("peakHoldInf",      false, nullptr);
             valueTree.setProperty("peakHoldDuration", 500,   nullptr);
+            peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_2000:
             valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
             valueTree.setProperty("peakHoldInf",      false, nullptr);
             valueTree.setProperty("peakHoldDuration", 2000,  nullptr);
+            peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_4000:
             valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
             valueTree.setProperty("peakHoldInf",      false, nullptr);
             valueTree.setProperty("peakHoldDuration", 4000,  nullptr);
+            peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_6000:
             valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
             valueTree.setProperty("peakHoldInf",      false, nullptr);
             valueTree.setProperty("peakHoldDuration", 6000,  nullptr);
+            peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_INF:
             valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
             valueTree.setProperty("peakHoldInf",      true,  nullptr);
+            peakHoldResetButton.setVisible(true);
             break;
         default: break;
     }
+}
+
+void PFM10AudioProcessorEditor::onPeakHoldResetClicked()
+{
+    peakStereoMeter.resetHold();
 }
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
@@ -1379,7 +1449,7 @@ void PFM10AudioProcessorEditor::resized()
     auto height = bounds.getHeight();
 
     peakStereoMeter.setTopLeftPosition(0, 0);
-    peakStereoMeter.setSize(width / 4, height * 2/3);
+    peakStereoMeter.setSize(120, height * 2/3);
 
     peakHistogram.setBounds(0,
                             peakStereoMeter.getBottom(),
@@ -1392,28 +1462,50 @@ void PFM10AudioProcessorEditor::resized()
                                height - peakHistogram.getHeight());
     
     // Menus
-    int menuWidth = 50;
-    int menuHeight = 20;
+    int menuWidth = 100;
+    int menuHeight = 30;
+    int menuX = peakStereoMeter.getRight();
     int verticalSpaceBetweenMenus = 20;
+    int goniometerScaleRotarySliderSize = 125;
     
-    decayRateMenu.setBounds(peakStereoMeter.getRight() + 10,
-                            0,
+    decayRateMenuLabel.setBounds(menuX,
+                                 0,
+                                 menuWidth,
+                                 menuHeight);
+    decayRateMenu.setBounds(menuX,
+                            decayRateMenuLabel.getBottom(),
                             menuWidth,
                             menuHeight);
     
-    averagerDurationMenu.setBounds(decayRateMenu.getX(),
-                                   decayRateMenu.getBottom() + verticalSpaceBetweenMenus,
+    averagerDurationMenuLabel.setBounds(menuX,
+                                        decayRateMenu.getBottom() + verticalSpaceBetweenMenus,
+                                        menuWidth,
+                                        menuHeight);
+    averagerDurationMenu.setBounds(menuX,
+                                   averagerDurationMenuLabel.getBottom(),
                                    menuWidth,
                                    menuHeight);
     
-    peakHoldDurationMenu.setBounds(averagerDurationMenu.getX(),
-                                   averagerDurationMenu.getBottom() + verticalSpaceBetweenMenus,
+    peakHoldDurationMenuLabel.setBounds(menuX,
+                                        averagerDurationMenu.getBottom() + verticalSpaceBetweenMenus,
+                                        menuWidth,
+                                        menuHeight);
+    peakHoldDurationMenu.setBounds(menuX,
+                                   peakHoldDurationMenuLabel.getBottom(),
                                    menuWidth,
                                    menuHeight);
     
-    int goniometerScaleRotarySliderSize = 75;
+    peakHoldResetButton.setBounds(menuX,
+                                  peakHoldDurationMenu.getBottom() + verticalSpaceBetweenMenus,
+                                  menuWidth,
+                                  menuHeight);
+    
+    goniometerScaleRotarySliderLabel.setBounds(stereoImageMeter.getRight() - goniometerScaleRotarySliderSize,
+                                               stereoImageMeter.getY(),
+                                               goniometerScaleRotarySliderSize,
+                                               menuHeight);
     goniometerScaleRotarySlider.setBounds(stereoImageMeter.getRight() - goniometerScaleRotarySliderSize,
-                                          stereoImageMeter.getY(),
+                                          goniometerScaleRotarySliderLabel.getBottom(),
                                           goniometerScaleRotarySliderSize,
                                           goniometerScaleRotarySliderSize);
 }

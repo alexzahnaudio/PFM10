@@ -82,6 +82,7 @@ struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
     DecayingValueHolder(juce::ValueTree _vt);
     ~DecayingValueHolder() override;
     void updateHeldValue(float input);
+    void resetHeldValue();
     float getHeldValue() const { return heldValue; }
     bool isOverThreshold() const;
     void setHoldTime(int ms);
@@ -114,6 +115,7 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     ~ValueHolder() override;
     void setThreshold(float th);
     void updateHeldValue(float v);
+    void resetHeldValue();
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
     void setHoldEnabled(bool b) { holdEnabled = b; }
     void setHoldForInf(bool b) { holdForInf = b; }
@@ -147,6 +149,7 @@ struct TextMeter : juce::Component
     void paint(juce::Graphics& g) override;
     void update(float valueDb);
     void setThreshold(float dbLevel);
+    void resetHold();
 private:
     float cachedValueDb;
     ValueHolder valueHolder;
@@ -162,6 +165,7 @@ struct Meter : juce::Component
     void update(float dbLevel);
     void setThreshold(float dbLevel) { dbThreshold = dbLevel; }
     void setPeakHoldEnabled(bool isEnabled) { peakHoldEnabled = isEnabled; }
+    void resetHold();
 private:
     bool peakHoldEnabled { true };
     float dbPeak { NEGATIVE_INFINITY };
@@ -179,6 +183,7 @@ struct MacroMeter : juce::Component
     void updateThreshold(float dbLevel);
     void setAveragerIntervals(int numElements);
     void setPeakHoldEnabled(bool isEnabled);
+    void resetHold();
     //==============================================================================
     int getTextHeight() const { return textHeight; }
     int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
@@ -217,6 +222,7 @@ struct StereoMeter : juce::Component, juce::ValueTree::Listener
 {
     StereoMeter(juce::ValueTree _vt, juce::String _meterName);
     ~StereoMeter() override;
+    void resetHold();
     void resized() override;
     void update(float leftChannelDb, float rightChannelDb);
 private:
@@ -378,6 +384,7 @@ private:
     //==============================================================================
     // Menus
     
+    juce::Label decayRateMenuLabel { {}, "Decay Rate" };
     enum DecayRates
     {
         DB_PER_SEC_3 = 1,
@@ -389,6 +396,7 @@ private:
     juce::ComboBox decayRateMenu;
     void onDecayRateMenuChanged();
     
+    juce::Label averagerDurationMenuLabel { {}, "RMS Length" };
     enum AveragerDurations
     {
         AVERAGER_DURATION_MS_100 = 1,
@@ -401,6 +409,7 @@ private:
     juce::ComboBox averagerDurationMenu;
     void onAveragerDurationChanged();
     
+    juce::Label peakHoldDurationMenuLabel { {}, "Hold Time" };
     enum PeakHoldDurations
     {
         PEAK_HOLD_DURATION_MS_0 = 1,
@@ -413,6 +422,10 @@ private:
     juce::ComboBox peakHoldDurationMenu;
     void onPeakHoldDurationChanged();
     
+    juce::TextButton peakHoldResetButton;
+    void onPeakHoldResetClicked();
+    
+    juce::Label goniometerScaleRotarySliderLabel { {}, "Gonio Scale" };
     juce::Slider goniometerScaleRotarySlider;
     
     void initMenus();
