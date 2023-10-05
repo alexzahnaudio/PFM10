@@ -45,25 +45,8 @@ private:
                           float sliderPos,
                           float minSliderPos,
                           float maxSliderPos,
-                          const juce::Slider::SliderStyle style, juce::Slider& slider) override
-    {
-        // This Look-And-Feel class is designed specifically for linear-bar style sliders!
-        //
-        // If you intend to expand this to handle other slider styles, then change this jassert
-        // to an if(slider.isBar()) condition and add an else block (see default LAF_V4 implementation),
-        // or create a different custom LAF class.
-        jassert (slider.isBar());
-
-        g.setColour (slider.findColour (juce::Slider::thumbColourId));
-        g.fillRect (slider.isHorizontal() ? juce::Rectangle<float> (sliderPos - thumbWidth,
-                                                                    (float) y + 0.5f,
-                                                                    thumbWidth,
-                                                                    (float) height - 1.0f)
-                                          : juce::Rectangle<float> ((float) x + 0.5f,
-                                                                    sliderPos,
-                                                                    (float) width - 1.0f,
-                                                                    thumbWidth));
-    }
+                          const juce::Slider::SliderStyle style,
+                          juce::Slider& slider) override;
 };
     
 //==============================================================================
@@ -74,7 +57,7 @@ private:
 template<typename T>
 struct Averager
 {
-    Averager(size_t numElements, T initialValue);
+    Averager(size_t _numElements, T _initialValue);
     
     void resize(size_t numElements, T initialValue);
     
@@ -87,27 +70,37 @@ struct Averager
     float getAvg() const { return avg; }
 private:
     std::vector<T> elements;
-    std::atomic<float> avg { static_cast<float>(T()) };
+    std::atomic<float> avg { NEGATIVE_INFINITY };
     std::atomic<size_t> writeIndex = 0;
-    std::atomic<T> sum { 0 };
+    std::atomic<T> sum { NEGATIVE_INFINITY };
 };
 
 //MARK: - DecayingValueHolder
 
-struct DecayingValueHolder : juce::Timer
+struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
 {
-    DecayingValueHolder();
+    DecayingValueHolder(juce::ValueTree _vt);
+    ~DecayingValueHolder() override;
     void updateHeldValue(float input);
+    void resetHeldValue();
     float getHeldValue() const { return heldValue; }
     bool isOverThreshold() const;
     void setHoldTime(int ms);
     void setDecayRate(float dbPerSec);
     void timerCallback() override;
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_decayRate        = juce::Identifier("decayRate");
+    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
+    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
+    
+    bool holdForInf  { false };
     float heldValue { NEGATIVE_INFINITY };
+    juce::int64 holdTimeMs = 2000; //2 seconds
     juce::int64 peakTime = getNow();
     float threshold = 0.f;
-    juce::int64 holdTime = 2000; //2 seconds
     float decayRatePerFrame { 0 };
     float decayRateMultiplier { 1 };
     static juce::int64 getNow();
@@ -116,23 +109,35 @@ private:
 
 //MARK: - ValueHolder
 
-struct ValueHolder : juce::Timer
+struct ValueHolder : juce::Timer, juce::ValueTree::Listener
 {
-    ValueHolder();
+    ValueHolder(juce::ValueTree _vt);
     ~ValueHolder() override;
-    void timerCallback() override;
     void setThreshold(float th);
     void updateHeldValue(float v);
+    void resetHeldValue();
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
+    void setHoldEnabled(bool b) { holdEnabled = b; }
+    void setHoldForInf(bool b) { holdForInf = b; }
     float getCurrentValue() const { return currentValue; }
     float getHeldValue() const { return heldValue; }
     bool getIsOverThreshold() const { return isOverThreshold; }
+    void timerCallback() override;
 private:
+    // Value Tree
+    juce::ValueTree vt;
+    juce::Identifier ID_peakHoldEnabled  = juce::Identifier("peakHoldEnabled");
+    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
+    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
+    
+    bool holdEnabled { true };
+    bool holdForInf  { false };
+    int durationToHoldForMs { 500 };
     float threshold = 0;
     float currentValue = NEGATIVE_INFINITY;
     float heldValue = NEGATIVE_INFINITY;
     juce::int64 timeOfPeak;
-    int durationToHoldForMs { 500 };
     bool isOverThreshold { false };
 };
 
@@ -140,10 +145,11 @@ private:
 
 struct TextMeter : juce::Component
 {
-    TextMeter();
+    TextMeter(juce::ValueTree _vt);
     void paint(juce::Graphics& g) override;
     void update(float valueDb);
     void setThreshold(float dbLevel);
+    void resetHold();
 private:
     float cachedValueDb;
     ValueHolder valueHolder;
@@ -154,10 +160,14 @@ private:
 
 struct Meter : juce::Component
 {
+    Meter(juce::ValueTree _vt);
     void paint (juce::Graphics&) override;
     void update(float dbLevel);
     void setThreshold(float dbLevel) { dbThreshold = dbLevel; }
+    void setPeakHoldEnabled(bool isEnabled) { peakHoldEnabled = isEnabled; }
+    void resetHold();
 private:
+    bool peakHoldEnabled { true };
     float dbPeak { NEGATIVE_INFINITY };
     float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
@@ -167,10 +177,13 @@ private:
 
 struct MacroMeter : juce::Component
 {
-    MacroMeter();
+    MacroMeter(juce::ValueTree _vt);
     void resized() override;
     void updateLevel(float level);
     void updateThreshold(float dbLevel);
+    void setAveragerIntervals(int numElements);
+    void setPeakHoldEnabled(bool isEnabled);
+    void resetHold();
     //==============================================================================
     int getTextHeight() const { return textHeight; }
     int getTextMeterHeight() const { return peakTextMeter.getHeight(); }
@@ -209,12 +222,15 @@ struct StereoMeter : juce::Component, juce::ValueTree::Listener
 {
     StereoMeter(juce::ValueTree _vt, juce::String _meterName);
     ~StereoMeter() override;
+    void resetHold();
     void resized() override;
     void update(float leftChannelDb, float rightChannelDb);
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    juce::Identifier ID_thresholdValue    = juce::Identifier("thresholdValue");
+    juce::Identifier ID_averagerIntervals = juce::Identifier("averagerIntervals");
+    juce::Identifier ID_peakHoldEnabled   = juce::Identifier("peakHoldEnabled");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
 
     // Look and Feel
@@ -283,6 +299,7 @@ struct Goniometer : juce::Component
     Goniometer(juce::AudioBuffer<float>& buffer);
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void setScale(float newScale) { scale = newScale; }
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
@@ -291,6 +308,7 @@ private:
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
+    float scale { 1.f };
 
     void buildBackground(juce::Graphics& g);
 };
@@ -326,7 +344,8 @@ struct StereoImageMeter : juce::Component, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
+    juce::Identifier ID_goniometerScale = juce::Identifier("goniometerScale");
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     Goniometer goniometer;
     CorrelationMeter correlationMeter;
@@ -361,6 +380,57 @@ private:
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
+    
+    //==============================================================================
+    // Menus
+    
+    juce::Label decayRateMenuLabel { {}, "Decay Rate" };
+    enum DecayRates
+    {
+        DB_PER_SEC_3 = 1,
+        DB_PER_SEC_6,
+        DB_PER_SEC_12,
+        DB_PER_SEC_24,
+        DB_PER_SEC_36
+    };
+    juce::ComboBox decayRateMenu;
+    void onDecayRateMenuChanged();
+    
+    juce::Label averagerDurationMenuLabel { {}, "RMS Length" };
+    enum AveragerDurations
+    {
+        AVERAGER_DURATION_MS_100 = 1,
+        AVERAGER_DURATION_MS_250,
+        AVERAGER_DURATION_MS_500,
+        AVERAGER_DURATION_MS_1000,
+        AVERAGER_DURATION_MS_2000
+    };
+    int durationMsToIntervals(int durationMs, int refreshRate) { return durationMs * refreshRate / 1000; }
+    juce::ComboBox averagerDurationMenu;
+    void onAveragerDurationChanged();
+    
+    juce::Label peakHoldDurationMenuLabel { {}, "Hold Time" };
+    enum PeakHoldDurations
+    {
+        PEAK_HOLD_DURATION_MS_0 = 1,
+        PEAK_HOLD_DURATION_MS_500,
+        PEAK_HOLD_DURATION_MS_2000,
+        PEAK_HOLD_DURATION_MS_4000,
+        PEAK_HOLD_DURATION_MS_6000,
+        PEAK_HOLD_DURATION_MS_INF
+    };
+    juce::ComboBox peakHoldDurationMenu;
+    void onPeakHoldDurationChanged();
+    
+    juce::TextButton peakHoldResetButton;
+    void onPeakHoldResetClicked();
+    
+    juce::Label goniometerScaleRotarySliderLabel { {}, "Gonio Scale" };
+    juce::Slider goniometerScaleRotarySlider;
+    
+    void initMenus();
+    
+    //==============================================================================
     
     int pluginWidth { 700 };
     int pluginHeight { 600 };
