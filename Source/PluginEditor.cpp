@@ -60,8 +60,8 @@ void Averager<T>::resize(size_t numElements, T initialValue)
 template<typename T>
 void Averager<T>::clear(T initialValue)
 {
-    int numElements = static_cast<int>(elements.size());
-    for (int i = 0; i < numElements; i++)
+    size_t numElements = elements.size();
+    for (size_t i = 0; i < numElements; i++)
     {
         elements[i] = initialValue;
     }
