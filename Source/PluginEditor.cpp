@@ -1046,16 +1046,12 @@ void Goniometer::paint(juce::Graphics &g)
             p.startNewSubPath(centerX + previousSideMapped, centerY + previousMidMapped);
             p.lineTo(centerX + sideMapped, centerY + midMapped);
                         
-            // Transparency scales from 0 to 1 as the buffer is traversed
+            // Transparency scales from 0.5 to 1.0 as the buffer is traversed
             opacity = juce::jmap(static_cast<float>(i),
                                  1.f,
                                  static_cast<float>(numSamples)-1,
-                                 0.f,
-                                 1.f);
-            // Apply this log scaling for an aesthetically "snappier" falloff
-            opacity = juce::mapToLog10(opacity,
-                                       0.01f,
-                                       1.f);
+                                 0.5f,
+                                 1.0f);
                                     
             g.setColour(juce::Colour(0.1f, 0.3f, opacity, opacity));
             g.strokePath(p, juce::PathStrokeType(2.f));
