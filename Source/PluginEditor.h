@@ -91,9 +91,6 @@ struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_decayRate        = juce::Identifier("decayRate");
-    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
-    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     bool holdForInf  { false };
@@ -126,9 +123,6 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_peakHoldEnabled  = juce::Identifier("peakHoldEnabled");
-    juce::Identifier ID_peakHoldInf      = juce::Identifier("peakHoldInf");
-    juce::Identifier ID_peakHoldDuration = juce::Identifier("peakHoldDuration");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     bool holdEnabled { true };
@@ -277,7 +271,6 @@ struct Histogram : juce::Component, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_thresholdValue = juce::Identifier("thresholdValue");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     ReadAllAfterWriteCircularBuffer<float> buffer {float(NEGATIVE_INFINITY)};
@@ -344,7 +337,6 @@ struct StereoImageMeter : juce::Component, juce::ValueTree::Listener
 private:
     // Value Tree
     juce::ValueTree vt;
-    juce::Identifier ID_goniometerScale = juce::Identifier("goniometerScale");
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     Goniometer goniometer;
@@ -373,7 +365,6 @@ private:
     PFM10AudioProcessor& audioProcessor;
     
     juce::ValueTree valueTree;
-    void initValueTree();
     
     juce::AudioBuffer<float> editorAudioBuffer;
     

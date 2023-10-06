@@ -19,9 +19,11 @@ PFM10AudioProcessor::PFM10AudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
 #endif
+       valueTree(IDs::root)
 {
+    initValueTree(valueTree);
 }
 
 PFM10AudioProcessor::~PFM10AudioProcessor()
@@ -205,6 +207,21 @@ void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes
 }
 
 //==============================================================================
+
+void PFM10AudioProcessor::initValueTree (juce::ValueTree& tree)
+{
+    // Set Up Properties using Identifiers
+    tree.setProperty(IDs::thresholdValue,    0.f,   nullptr);
+    tree.setProperty(IDs::decayRate,         0.f,   nullptr);
+    tree.setProperty(IDs::averagerIntervals, 0,     nullptr);
+    tree.setProperty(IDs::peakHoldEnabled,   true,  nullptr);
+    tree.setProperty(IDs::peakHoldInf,       false, nullptr);
+    tree.setProperty(IDs::peakHoldDuration,  0,     nullptr);
+    tree.setProperty(IDs::goniometerScale,   0.f,   nullptr);
+}
+
+//==============================================================================
+
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {

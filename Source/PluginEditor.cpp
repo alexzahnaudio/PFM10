@@ -113,21 +113,21 @@ DecayingValueHolder::~DecayingValueHolder()
 
 void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
 {
-    if (_ID == ID_decayRate)
+    if (_ID == IDs::decayRate)
     {
-        float decayRate = _vt.getProperty(ID_decayRate);
+        float decayRate = _vt.getProperty(IDs::decayRate);
         
         setDecayRate(decayRate);
     }
-    else if (_ID == ID_peakHoldDuration)
+    else if (_ID == IDs::peakHoldDuration)
     {
-        float newHoldDuration = _vt.getProperty(ID_peakHoldDuration);
+        int newHoldDuration = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldTime(newHoldDuration);
     }
-    else if (_ID == ID_peakHoldInf)
+    else if (_ID == IDs::peakHoldInf)
     {
-        bool isInfiniteHoldEnabled = _vt.getProperty(ID_peakHoldInf);
+        bool isInfiniteHoldEnabled = _vt.getProperty(IDs::peakHoldInf);
         
         holdForInf = isInfiniteHoldEnabled;
     }
@@ -212,15 +212,15 @@ ValueHolder::~ValueHolder()
 
 void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
 {
-    if (_ID == ID_peakHoldDuration)
+    if (_ID == IDs::peakHoldDuration)
     {
-        int newHoldDurationMs = _vt.getProperty(ID_peakHoldDuration);
+        int newHoldDurationMs = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldDuration(newHoldDurationMs);
     }
-    else if (_ID == ID_peakHoldEnabled)
+    else if (_ID == IDs::peakHoldEnabled)
     {
-        bool b = _vt.getProperty(ID_peakHoldEnabled);
+        bool b = _vt.getProperty(IDs::peakHoldEnabled);
         
         setHoldEnabled(b);
         
@@ -229,9 +229,9 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
             setHoldDuration(0);
         }
     }
-    else if (_ID == ID_peakHoldInf)
+    else if (_ID == IDs::peakHoldInf)
     {
-        bool b = _vt.getProperty(ID_peakHoldInf);
+        bool b = _vt.getProperty(IDs::peakHoldInf);
         
         setHoldForInf(b);
     }
@@ -577,7 +577,7 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     addAndMakeVisible(label);
     
     // update value tree when threshold slider value is changed
-    thresholdSlider.onValueChange = [this] {vt.setProperty("thresholdValue", thresholdSlider.getValue(), nullptr);};
+    thresholdSlider.onValueChange = [this] {vt.setProperty(IDs::thresholdValue, thresholdSlider.getValue(), nullptr);};
     // threshold slider range, style, look-and-feel
     thresholdSlider.setRange(NEGATIVE_INFINITY, MAX_DECIBELS);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
@@ -594,23 +594,23 @@ StereoMeter::~StereoMeter()
 
 void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
 {
-    if (_ID == ID_thresholdValue)
+    if (_ID == IDs::thresholdValue)
     {
-        float dbLevel = _vt.getProperty(ID_thresholdValue);
+        float dbLevel = _vt.getProperty(IDs::thresholdValue);
         
         leftMacroMeter.updateThreshold(dbLevel);
         rightMacroMeter.updateThreshold(dbLevel);
     }
-    else if (_ID == ID_averagerIntervals)
+    else if (_ID == IDs::averagerIntervals)
     {
-        int newNumAveragerIntervals = _vt.getProperty(ID_averagerIntervals);
+        int newNumAveragerIntervals = _vt.getProperty(IDs::averagerIntervals);
         
         leftMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
         rightMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
     }
-    else if (_ID == ID_peakHoldEnabled)
+    else if (_ID == IDs::peakHoldEnabled)
     {
-        bool peakHoldEnabled = _vt.getProperty(ID_peakHoldEnabled);
+        bool peakHoldEnabled = _vt.getProperty(IDs::peakHoldEnabled);
         
         leftMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
         rightMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
@@ -742,9 +742,9 @@ Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
 
 void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
 {
-    if (_ID == ID_thresholdValue)
+    if (_ID == IDs::thresholdValue)
     {
-        dbThreshold = _vt.getProperty(ID_thresholdValue);
+        dbThreshold = _vt.getProperty(IDs::thresholdValue);
     }
 }
 
@@ -1202,9 +1202,9 @@ StereoImageMeter::StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>
 
 void StereoImageMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
 {
-    if (_ID == ID_goniometerScale)
+    if (_ID == IDs::goniometerScale)
     {
-        goniometer.setScale( _vt.getProperty(ID_goniometerScale) );
+        goniometer.setScale( _vt.getProperty(IDs::goniometerScale) );
     }
 }
 
@@ -1235,14 +1235,12 @@ void StereoImageMeter::update()
 PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
-      valueTree(juce::Identifier("root")),
+      valueTree(p.valueTree),
       editorAudioBuffer(2, 512),
       peakStereoMeter(valueTree, juce::String("Peak")),
       peakHistogram(valueTree, juce::String("Peak")),
       stereoImageMeter(valueTree, editorAudioBuffer, audioProcessor.getSampleRate())
 {
-    initValueTree();
-    
     setSize (pluginWidth, pluginHeight);
     
     //setResizable(true, true);
@@ -1260,27 +1258,6 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
 {
-}
-
-void PFM10AudioProcessorEditor::initValueTree()
-{
-    // Property Identifiers
-    static juce::Identifier thresholdValue       ("thresholdValue");
-    static juce::Identifier decayRate            ("decayRate");
-    static juce::Identifier averagerIntervals    ("averagerIntervals");
-    static juce::Identifier peakHoldEnabled      ("peakHoldEnabled");
-    static juce::Identifier peakHoldInf          ("peakHoldInf");
-    static juce::Identifier peakHoldDuration     ("peakHoldDuration");
-    static juce::Identifier goniometerScale      ("goniometerScale");
-    
-    // Set Up Properties using Identifiers
-    valueTree.setProperty(thresholdValue,    0.f,   nullptr);
-    valueTree.setProperty(decayRate,         0.f,   nullptr);
-    valueTree.setProperty(averagerIntervals, 0,     nullptr);
-    valueTree.setProperty(peakHoldEnabled,   true,  nullptr);
-    valueTree.setProperty(peakHoldInf,       false, nullptr);
-    valueTree.setProperty(peakHoldDuration,  0,     nullptr);
-    valueTree.setProperty(goniometerScale,   0.f,   nullptr);
 }
 
 void PFM10AudioProcessorEditor::initMenus()
@@ -1352,7 +1329,7 @@ void PFM10AudioProcessorEditor::initMenus()
     goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
     goniometerScaleRotarySlider.onValueChange = [this]
     {
-        valueTree.setProperty("goniometerScale", goniometerScaleRotarySlider.getValue(), nullptr);
+        valueTree.setProperty(IDs::goniometerScale, goniometerScaleRotarySlider.getValue(), nullptr);
     };
     goniometerScaleRotarySlider.setValue(1.f);
     addAndMakeVisible(goniometerScaleRotarySlider);
@@ -1362,11 +1339,11 @@ void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
 {
     switch (decayRateMenu.getSelectedId())
     {
-        case DB_PER_SEC_3:  valueTree.setProperty("decayRate",  3.f, nullptr); break;
-        case DB_PER_SEC_6:  valueTree.setProperty("decayRate",  6.f, nullptr); break;
-        case DB_PER_SEC_12: valueTree.setProperty("decayRate", 12.f, nullptr); break;
-        case DB_PER_SEC_24: valueTree.setProperty("decayRate", 24.f, nullptr); break;
-        case DB_PER_SEC_36: valueTree.setProperty("decayRate", 36.f, nullptr); break;
+        case DB_PER_SEC_3:  valueTree.setProperty(IDs::decayRate,  3.f, nullptr); break;
+        case DB_PER_SEC_6:  valueTree.setProperty(IDs::decayRate,  6.f, nullptr); break;
+        case DB_PER_SEC_12: valueTree.setProperty(IDs::decayRate, 12.f, nullptr); break;
+        case DB_PER_SEC_24: valueTree.setProperty(IDs::decayRate, 24.f, nullptr); break;
+        case DB_PER_SEC_36: valueTree.setProperty(IDs::decayRate, 36.f, nullptr); break;
         default: break;
     }
 }
@@ -1376,15 +1353,15 @@ void PFM10AudioProcessorEditor::onAveragerDurationChanged()
     switch (averagerDurationMenu.getSelectedId())
     {
         case AVERAGER_DURATION_MS_100:
-            valueTree.setProperty("averagerIntervals", durationMsToIntervals(100,  refreshRateHz), nullptr); break;
+            valueTree.setProperty(IDs::averagerIntervals, durationMsToIntervals(100,  refreshRateHz), nullptr); break;
         case AVERAGER_DURATION_MS_250:
-            valueTree.setProperty("averagerIntervals", durationMsToIntervals(250,  refreshRateHz), nullptr); break;
+            valueTree.setProperty(IDs::averagerIntervals, durationMsToIntervals(250,  refreshRateHz), nullptr); break;
         case AVERAGER_DURATION_MS_500:
-            valueTree.setProperty("averagerIntervals", durationMsToIntervals(500,  refreshRateHz), nullptr); break;
+            valueTree.setProperty(IDs::averagerIntervals, durationMsToIntervals(500,  refreshRateHz), nullptr); break;
         case AVERAGER_DURATION_MS_1000:
-            valueTree.setProperty("averagerIntervals", durationMsToIntervals(1000, refreshRateHz), nullptr); break;
+            valueTree.setProperty(IDs::averagerIntervals, durationMsToIntervals(1000, refreshRateHz), nullptr); break;
         case AVERAGER_DURATION_MS_2000:
-            valueTree.setProperty("averagerIntervals", durationMsToIntervals(2000, refreshRateHz), nullptr); break;
+            valueTree.setProperty(IDs::averagerIntervals, durationMsToIntervals(2000, refreshRateHz), nullptr); break;
         default: break;
     }
 }
@@ -1394,37 +1371,37 @@ void PFM10AudioProcessorEditor::onPeakHoldDurationChanged()
     switch (peakHoldDurationMenu.getSelectedId())
     {
         case PEAK_HOLD_DURATION_MS_0:
-            valueTree.setProperty("peakHoldEnabled",  false, nullptr);
-            valueTree.setProperty("peakHoldInf",      false, nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  false, nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      false, nullptr);
             peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_500:
-            valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
-            valueTree.setProperty("peakHoldInf",      false, nullptr);
-            valueTree.setProperty("peakHoldDuration", 500,   nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      false, nullptr);
+            valueTree.setProperty(IDs::peakHoldDuration, 500,   nullptr);
             peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_2000:
-            valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
-            valueTree.setProperty("peakHoldInf",      false, nullptr);
-            valueTree.setProperty("peakHoldDuration", 2000,  nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      false, nullptr);
+            valueTree.setProperty(IDs::peakHoldDuration, 2000,  nullptr);
             peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_4000:
-            valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
-            valueTree.setProperty("peakHoldInf",      false, nullptr);
-            valueTree.setProperty("peakHoldDuration", 4000,  nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      false, nullptr);
+            valueTree.setProperty(IDs::peakHoldDuration, 4000,  nullptr);
             peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_6000:
-            valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
-            valueTree.setProperty("peakHoldInf",      false, nullptr);
-            valueTree.setProperty("peakHoldDuration", 6000,  nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      false, nullptr);
+            valueTree.setProperty(IDs::peakHoldDuration, 6000,  nullptr);
             peakHoldResetButton.setVisible(false);
             break;
         case PEAK_HOLD_DURATION_MS_INF:
-            valueTree.setProperty("peakHoldEnabled",  true,  nullptr);
-            valueTree.setProperty("peakHoldInf",      true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldEnabled,  true,  nullptr);
+            valueTree.setProperty(IDs::peakHoldInf,      true,  nullptr);
             peakHoldResetButton.setVisible(true);
             break;
         default: break;
