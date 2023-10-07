@@ -23,7 +23,7 @@ PFM10AudioProcessor::PFM10AudioProcessor()
 #endif
        valueTree(IDs::root)
 {
-    initValueTree(valueTree);
+    initDefaultValueTree(valueTree);
 }
 
 PFM10AudioProcessor::~PFM10AudioProcessor()
@@ -198,17 +198,38 @@ void PFM10AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    
+    juce::MemoryOutputStream outputStream = juce::MemoryOutputStream(destData, false);
+    
+    valueTree.writeToStream(outputStream);
+    
+    DBG("Wrote value tree state to memory:\n" << valueTree.toXmlString() << '\n');
 }
 
 void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    
+    juce::ValueTree loadedTree = juce::ValueTree::readFromData(data, static_cast<size_t>(sizeInBytes));
+    
+    if (loadedTree.isValid() && hasNeededProperties(loadedTree))
+    {
+        DBG("Loaded value tree state:\n" << loadedTree.toXmlString() << '\n');
+        
+        valueTree.copyPropertiesAndChildrenFrom(loadedTree, nullptr);
+        
+        DBG("Value tree state:\n" << valueTree.toXmlString() << '\n');
+    }
+    else
+    {
+        // Do nothing. Do not overwrite the value tree's default values.
+    }
 }
 
 //==============================================================================
 
-void PFM10AudioProcessor::initValueTree (juce::ValueTree& tree)
+void PFM10AudioProcessor::initDefaultValueTree (juce::ValueTree& tree)
 {
     // Set Up Properties using Identifiers
     tree.setProperty(IDs::thresholdValue,    0.f,   nullptr);
@@ -218,6 +239,20 @@ void PFM10AudioProcessor::initValueTree (juce::ValueTree& tree)
     tree.setProperty(IDs::peakHoldInf,       false, nullptr);
     tree.setProperty(IDs::peakHoldDuration,  0,     nullptr);
     tree.setProperty(IDs::goniometerScale,   0.f,   nullptr);
+}
+
+bool PFM10AudioProcessor::hasNeededProperties (juce::ValueTree& tree)
+{
+    if (! tree.hasProperty(IDs::thresholdValue))    return false;
+    if (! tree.hasProperty(IDs::decayRate))         return false;
+    if (! tree.hasProperty(IDs::averagerIntervals)) return false;
+    if (! tree.hasProperty(IDs::peakHoldEnabled))   return false;
+    if (! tree.hasProperty(IDs::peakHoldInf))       return false;
+    if (! tree.hasProperty(IDs::peakHoldDuration))  return false;
+    if (! tree.hasProperty(IDs::goniometerScale))   return false;
+    if (! tree.hasProperty(IDs::decayRate))         return false;
+    
+    return true;
 }
 
 //==============================================================================

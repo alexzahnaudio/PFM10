@@ -119,7 +119,8 @@ public:
 
 private:
     //==============================================================================
-    void initValueTree (juce::ValueTree& tree);
+    void initDefaultValueTree (juce::ValueTree& tree);
+    bool hasNeededProperties (juce::ValueTree& tree);
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PFM10AudioProcessor)
