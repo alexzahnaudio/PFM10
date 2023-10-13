@@ -232,13 +232,13 @@ void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes
 void PFM10AudioProcessor::initDefaultValueTree (juce::ValueTree& tree)
 {
     // Set Up Properties using Identifiers
-    tree.setProperty(IDs::thresholdValue,    0.f,   nullptr);
-    tree.setProperty(IDs::decayRate,         0.f,   nullptr);
-    tree.setProperty(IDs::averagerIntervals, 0,     nullptr);
-    tree.setProperty(IDs::peakHoldEnabled,   true,  nullptr);
-    tree.setProperty(IDs::peakHoldInf,       false, nullptr);
-    tree.setProperty(IDs::peakHoldDuration,  0,     nullptr);
-    tree.setProperty(IDs::goniometerScale,   0.f,   nullptr);
+    tree.setProperty(IDs::thresholdValue,    DefaultPropertyValues::thresholdValue,    nullptr);
+    tree.setProperty(IDs::decayRate,         DefaultPropertyValues::decayRate,         nullptr);
+    tree.setProperty(IDs::averagerIntervals, DefaultPropertyValues::averagerIntervals, nullptr);
+    tree.setProperty(IDs::peakHoldEnabled,   DefaultPropertyValues::peakHoldEnabled,   nullptr);
+    tree.setProperty(IDs::peakHoldInf,       DefaultPropertyValues::peakHoldInf,       nullptr);
+    tree.setProperty(IDs::peakHoldDuration,  DefaultPropertyValues::peakHoldDuration,  nullptr);
+    tree.setProperty(IDs::goniometerScale,   DefaultPropertyValues::goniometerScale,   nullptr);
 }
 
 bool PFM10AudioProcessor::hasNeededProperties (juce::ValueTree& tree)

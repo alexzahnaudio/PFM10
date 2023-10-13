@@ -14,6 +14,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include "Identifiers.h"
+#include "DefaultPropertyValues.h"
 
 template<typename T, size_t Size>           // T will be juce::AudioBuffer<float>
 struct Fifo

@@ -93,15 +93,13 @@ private:
     juce::ValueTree vt;
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
-    bool holdForInf  { false };
+    bool holdForInf;
     float heldValue { NEGATIVE_INFINITY };
-    juce::int64 holdTimeMs = 2000; //2 seconds
+    juce::int64 holdTimeMs;
     juce::int64 peakTime = getNow();
-    float threshold = 0.f;
-    float decayRatePerFrame { 0 };
-    float decayRateMultiplier { 1 };
+    float threshold { NEGATIVE_INFINITY };
+    float decayRatePerFrame;
     static juce::int64 getNow();
-    void resetDecayRateMultiplier() { decayRateMultiplier = 1; }
 };
 
 //MARK: - ValueHolder
@@ -114,7 +112,7 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     void updateHeldValue(float v);
     void resetHeldValue();
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
-    void setHoldEnabled(bool b) { holdEnabled = b; }
+    void setHoldEnabled(bool b);
     void setHoldForInf(bool b) { holdForInf = b; }
     float getCurrentValue() const { return currentValue; }
     float getHeldValue() const { return heldValue; }
@@ -125,12 +123,12 @@ private:
     juce::ValueTree vt;
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
-    bool holdEnabled { true };
-    bool holdForInf  { false };
-    int durationToHoldForMs { 500 };
-    float threshold = 0;
-    float currentValue = NEGATIVE_INFINITY;
-    float heldValue = NEGATIVE_INFINITY;
+    bool holdEnabled;
+    bool holdForInf;
+    int durationToHoldForMs;
+    float threshold { NEGATIVE_INFINITY };
+    float currentValue { NEGATIVE_INFINITY };
+    float heldValue { NEGATIVE_INFINITY };
     juce::int64 timeOfPeak;
     bool isOverThreshold { false };
 };
@@ -385,6 +383,7 @@ private:
         DB_PER_SEC_36
     };
     juce::ComboBox decayRateMenu;
+    int decayRateMenuSelectByValue(int value);
     void onDecayRateMenuChanged();
     
     juce::Label averagerDurationMenuLabel { {}, "RMS Length" };
@@ -397,8 +396,10 @@ private:
         AVERAGER_DURATION_MS_2000
     };
     int durationMsToIntervals(int durationMs, int refreshRate) { return durationMs * refreshRate / 1000; }
+    int intervalsToDurationMs(int intervals, int refreshRate) { return intervals * 1000 / refreshRate; }
     juce::ComboBox averagerDurationMenu;
-    void onAveragerDurationChanged();
+    int averagerDurationMenuSelectByValue(int value);
+    void onAveragerDurationMenuChanged();
     
     juce::Label peakHoldDurationMenuLabel { {}, "Hold Time" };
     enum PeakHoldDurations
@@ -411,10 +412,11 @@ private:
         PEAK_HOLD_DURATION_MS_INF
     };
     juce::ComboBox peakHoldDurationMenu;
-    void onPeakHoldDurationChanged();
+    int peakHoldDurationMenuSelectByValueTree(juce::ValueTree& tree);
+    void onPeakHoldDurationMenuChanged();
     
     juce::TextButton peakHoldResetButton;
-    void onPeakHoldResetClicked();
+    void onPeakHoldResetButtonClicked();
     
     juce::Label goniometerScaleRotarySliderLabel { {}, "Gonio Scale" };
     juce::Slider goniometerScaleRotarySlider;

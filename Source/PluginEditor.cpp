@@ -104,6 +104,10 @@ DecayingValueHolder::DecayingValueHolder(juce::ValueTree _vt)
     vt.addListener(this);
     
     startTimerHz(60);
+    
+    holdForInf = vt.getProperty(IDs::peakHoldInf);
+    holdTimeMs = vt.getProperty(IDs::peakHoldDuration);
+    decayRatePerFrame = vt.getProperty(IDs::decayRate);
 }
 
 DecayingValueHolder::~DecayingValueHolder()
@@ -130,6 +134,8 @@ void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const j
         bool isInfiniteHoldEnabled = _vt.getProperty(IDs::peakHoldInf);
         
         holdForInf = isInfiniteHoldEnabled;
+        
+        if (! isInfiniteHoldEnabled) resetHeldValue();
     }
 }
 
@@ -139,7 +145,6 @@ void DecayingValueHolder::updateHeldValue(float input)
     {
         peakTime = getNow();
         heldValue = input;
-        decayRateMultiplier = 1;
     }
 }
 
@@ -172,18 +177,11 @@ void DecayingValueHolder::timerCallback()
     {
         if ((now - peakTime) > holdTimeMs)
         {
-            heldValue -= decayRatePerFrame * decayRateMultiplier;
+            heldValue -= decayRatePerFrame;
             
             heldValue = juce::jlimit(NEGATIVE_INFINITY,
                                      MAX_DECIBELS,
                                      heldValue);
-            
-            //decayRateMultiplier += 2;
-            
-            if (heldValue <= NEGATIVE_INFINITY)
-            {
-                resetDecayRateMultiplier();
-            }
         }
     }
 }
@@ -203,6 +201,10 @@ ValueHolder::ValueHolder(juce::ValueTree _vt)
     
     timeOfPeak = juce::Time::currentTimeMillis();
     startTimerHz(60);
+    
+    setHoldForInf( vt.getProperty(IDs::peakHoldInf) );
+    setHoldDuration( vt.getProperty(IDs::peakHoldDuration) );
+    setHoldEnabled( vt.getProperty(IDs::peakHoldEnabled) );
 }
 
 ValueHolder::~ValueHolder()
@@ -223,11 +225,6 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         bool b = _vt.getProperty(IDs::peakHoldEnabled);
         
         setHoldEnabled(b);
-        
-        if (!b)
-        {
-            setHoldDuration(0);
-        }
     }
     else if (_ID == IDs::peakHoldInf)
     {
@@ -253,6 +250,13 @@ void ValueHolder::setThreshold(float th)
 {
     threshold = th;
     isOverThreshold = (heldValue > threshold);
+}
+
+void ValueHolder::setHoldEnabled(bool b)
+{
+    holdEnabled = b;
+    
+    if (! b) setHoldDuration(0);
 }
 
 void ValueHolder::updateHeldValue(float v)
@@ -330,6 +334,7 @@ void TextMeter::resetHold()
 Meter::Meter(juce::ValueTree _vt)
 : decayingValueHolder(_vt)
 {
+    setPeakHoldEnabled(_vt.getProperty(IDs::peakHoldEnabled));
 }
 
 void Meter::paint(juce::Graphics& g)
@@ -395,7 +400,7 @@ MacroMeter::MacroMeter(juce::ValueTree _vt)
 : peakTextMeter(_vt),
   peakMeter(_vt),
   averageMeter(_vt),
-  averager(30, 0)
+  averager(30, NEGATIVE_INFINITY)
 {
     addAndMakeVisible(peakTextMeter);
     addAndMakeVisible(peakMeter);
@@ -576,8 +581,8 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     label.setText("L  " + _meterName + "  R", juce::dontSendNotification);
     addAndMakeVisible(label);
     
-    // update value tree when threshold slider value is changed
-    thresholdSlider.onValueChange = [this] {vt.setProperty(IDs::thresholdValue, thresholdSlider.getValue(), nullptr);};
+    // update value tree when threshold slider value is changed, and vice versa
+    thresholdSlider.getValueObject().referTo(vt.getPropertyAsValue(IDs::thresholdValue, nullptr));
     // threshold slider range, style, look-and-feel
     thresholdSlider.setRange(NEGATIVE_INFINITY, MAX_DECIBELS);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
@@ -585,6 +590,10 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
     // add and make slider visible
     addAndMakeVisible(thresholdSlider);
+    
+    float initialThresholdValue = vt.getProperty(IDs::thresholdValue);
+    leftMacroMeter.updateThreshold(initialThresholdValue);
+    rightMacroMeter.updateThreshold(initialThresholdValue);
 }
 
 StereoMeter::~StereoMeter()
@@ -738,6 +747,7 @@ Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
       title(_title)
 {
     vt.addListener(this);
+    dbThreshold = _vt.getProperty(IDs::thresholdValue);
 }
 
 void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
@@ -1270,7 +1280,7 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.addItem("-36dB/s", DB_PER_SEC_36);
     decayRateMenu.setTooltip("Peak Marker Decay Rate");
     decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
-    decayRateMenu.setSelectedId(DB_PER_SEC_12);
+    decayRateMenu.setSelectedId( decayRateMenuSelectByValue(valueTree.getProperty(IDs::decayRate)) );
     addAndMakeVisible(decayRateMenu);
     
     // Averager Duration Menu
@@ -1284,8 +1294,8 @@ void PFM10AudioProcessorEditor::initMenus()
     averagerDurationMenu.addItem("1000ms", AVERAGER_DURATION_MS_1000);
     averagerDurationMenu.addItem("2000ms", AVERAGER_DURATION_MS_2000);
     averagerDurationMenu.setTooltip("Averaging duration for RMS meters");
-    averagerDurationMenu.onChange = [this] { onAveragerDurationChanged(); };
-    averagerDurationMenu.setSelectedId(AVERAGER_DURATION_MS_100);
+    averagerDurationMenu.onChange = [this] { onAveragerDurationMenuChanged(); };
+    averagerDurationMenu.setSelectedId( averagerDurationMenuSelectByValue(valueTree.getProperty(IDs::averagerIntervals)) );
     addAndMakeVisible(averagerDurationMenu);
     
     // Peak Hold Duration Menu
@@ -1300,14 +1310,15 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldDurationMenu.addItem("6s",   PEAK_HOLD_DURATION_MS_6000);
     peakHoldDurationMenu.addItem("inf",  PEAK_HOLD_DURATION_MS_INF);
     peakHoldDurationMenu.setTooltip("Peak hold duration for meters");
-    peakHoldDurationMenu.onChange = [this] { onPeakHoldDurationChanged(); };
-    peakHoldDurationMenu.setSelectedId(PEAK_HOLD_DURATION_MS_500);
+    peakHoldDurationMenu.onChange = [this] { onPeakHoldDurationMenuChanged(); };
+    peakHoldDurationMenu.setSelectedId( peakHoldDurationMenuSelectByValueTree(valueTree) );
     addAndMakeVisible(peakHoldDurationMenu);
     
     // Peak Hold Reset Button
     
     peakHoldResetButton.setButtonText("Reset Hold");
-    peakHoldResetButton.onClick = [this] { onPeakHoldResetClicked(); };
+    peakHoldResetButton.onClick = [this] { onPeakHoldResetButtonClicked(); };
+    peakHoldResetButton.setVisible( valueTree.getProperty(IDs::peakHoldInf) );
     addAndMakeVisible(peakHoldResetButton);
     
     // Goniometer Scale Rotary Slider
@@ -1323,28 +1334,46 @@ void PFM10AudioProcessorEditor::initMenus()
     };
     goniometerScaleRotarySlider.setTooltip("Goniometer Scale");
     goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
-    goniometerScaleRotarySlider.onValueChange = [this]
-    {
-        valueTree.setProperty(IDs::goniometerScale, goniometerScaleRotarySlider.getValue(), nullptr);
-    };
-    goniometerScaleRotarySlider.setValue(1.f);
+    goniometerScaleRotarySlider.getValueObject().referTo(valueTree.getPropertyAsValue(IDs::goniometerScale, nullptr));
     addAndMakeVisible(goniometerScaleRotarySlider);
+}
+
+int PFM10AudioProcessorEditor::decayRateMenuSelectByValue(int value)
+{
+    if      (value == 3)  return DB_PER_SEC_3;
+    else if (value == 6)  return DB_PER_SEC_6;
+    else if (value == 12) return DB_PER_SEC_12;
+    else if (value == 24) return DB_PER_SEC_24;
+    else if (value == 36) return DB_PER_SEC_36;
+    else                  return 1;
 }
 
 void PFM10AudioProcessorEditor::onDecayRateMenuChanged()
 {
     switch (decayRateMenu.getSelectedId())
     {
-        case DB_PER_SEC_3:  valueTree.setProperty(IDs::decayRate,  3.f, nullptr); break;
-        case DB_PER_SEC_6:  valueTree.setProperty(IDs::decayRate,  6.f, nullptr); break;
-        case DB_PER_SEC_12: valueTree.setProperty(IDs::decayRate, 12.f, nullptr); break;
-        case DB_PER_SEC_24: valueTree.setProperty(IDs::decayRate, 24.f, nullptr); break;
-        case DB_PER_SEC_36: valueTree.setProperty(IDs::decayRate, 36.f, nullptr); break;
+        case DB_PER_SEC_3:  valueTree.setProperty(IDs::decayRate,  3, nullptr); break;
+        case DB_PER_SEC_6:  valueTree.setProperty(IDs::decayRate,  6, nullptr); break;
+        case DB_PER_SEC_12: valueTree.setProperty(IDs::decayRate, 12, nullptr); break;
+        case DB_PER_SEC_24: valueTree.setProperty(IDs::decayRate, 24, nullptr); break;
+        case DB_PER_SEC_36: valueTree.setProperty(IDs::decayRate, 36, nullptr); break;
         default: break;
     }
 }
 
-void PFM10AudioProcessorEditor::onAveragerDurationChanged()
+int PFM10AudioProcessorEditor::averagerDurationMenuSelectByValue(int value)
+{
+    int valueMs = intervalsToDurationMs(value, refreshRateHz);
+    
+    if      (valueMs == 100)  return AVERAGER_DURATION_MS_100;
+    else if (valueMs == 250)  return AVERAGER_DURATION_MS_250;
+    else if (valueMs == 500)  return AVERAGER_DURATION_MS_500;
+    else if (valueMs == 1000) return AVERAGER_DURATION_MS_1000;
+    else if (valueMs == 2000) return AVERAGER_DURATION_MS_2000;
+    else                      return 1;
+}
+
+void PFM10AudioProcessorEditor::onAveragerDurationMenuChanged()
 {
     switch (averagerDurationMenu.getSelectedId())
     {
@@ -1362,7 +1391,22 @@ void PFM10AudioProcessorEditor::onAveragerDurationChanged()
     }
 }
 
-void PFM10AudioProcessorEditor::onPeakHoldDurationChanged()
+int PFM10AudioProcessorEditor::peakHoldDurationMenuSelectByValueTree(juce::ValueTree& tree)
+{
+    bool enabled = tree.getProperty(IDs::peakHoldEnabled);
+    bool inf     = tree.getProperty(IDs::peakHoldInf);
+    int duration = tree.getProperty(IDs::peakHoldDuration);
+    
+    if      (! enabled)        return PEAK_HOLD_DURATION_MS_0;
+    else if (inf)              return PEAK_HOLD_DURATION_MS_INF;
+    else if (duration == 500)  return PEAK_HOLD_DURATION_MS_500;
+    else if (duration == 2000) return PEAK_HOLD_DURATION_MS_2000;
+    else if (duration == 4000) return PEAK_HOLD_DURATION_MS_4000;
+    else if (duration == 6000) return PEAK_HOLD_DURATION_MS_6000;
+    else                       return 1;
+}
+
+void PFM10AudioProcessorEditor::onPeakHoldDurationMenuChanged()
 {
     switch (peakHoldDurationMenu.getSelectedId())
     {
@@ -1404,7 +1448,7 @@ void PFM10AudioProcessorEditor::onPeakHoldDurationChanged()
     }
 }
 
-void PFM10AudioProcessorEditor::onPeakHoldResetClicked()
+void PFM10AudioProcessorEditor::onPeakHoldResetButtonClicked()
 {
     peakStereoMeter.resetHold();
 }
