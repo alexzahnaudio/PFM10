@@ -87,6 +87,7 @@ struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
     bool isOverThreshold() const;
     void setHoldTime(int ms);
     void setDecayRate(float dbPerSec);
+    void setHoldForInf(bool b);
     void timerCallback() override;
 private:
     // Value Tree

@@ -105,9 +105,9 @@ DecayingValueHolder::DecayingValueHolder(juce::ValueTree _vt)
     
     startTimerHz(60);
     
-    holdForInf = vt.getProperty(IDs::peakHoldInf);
-    holdTimeMs = vt.getProperty(IDs::peakHoldDuration);
-    decayRatePerFrame = vt.getProperty(IDs::decayRate);
+    setHoldForInf( vt.getProperty(IDs::peakHoldInf) );
+    setHoldTime( vt.getProperty(IDs::peakHoldDuration) );
+    setDecayRate( vt.getProperty(IDs::decayRate) );
 }
 
 DecayingValueHolder::~DecayingValueHolder()
@@ -133,9 +133,7 @@ void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const j
     {
         bool isInfiniteHoldEnabled = _vt.getProperty(IDs::peakHoldInf);
         
-        holdForInf = isInfiniteHoldEnabled;
-        
-        if (! isInfiniteHoldEnabled) resetHeldValue();
+        setHoldForInf(isInfiniteHoldEnabled);
     }
 }
 
@@ -167,6 +165,13 @@ void DecayingValueHolder::setDecayRate(float dbPerSec)
 {
     // note: getTimerInterval() returns milliseconds
     decayRatePerFrame = dbPerSec * getTimerInterval() / 1000;
+}
+
+void DecayingValueHolder::setHoldForInf(bool b)
+{
+    holdForInf = b;
+    
+    if (! b) resetHeldValue();
 }
 
 void DecayingValueHolder::timerCallback()
