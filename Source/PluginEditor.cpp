@@ -588,12 +588,11 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     
     // update value tree when threshold slider value is changed, and vice versa
     thresholdSlider.getValueObject().referTo(vt.getPropertyAsValue(IDs::thresholdValue, nullptr));
-    // threshold slider range, style, look-and-feel
     thresholdSlider.setRange(NEGATIVE_INFINITY, MAX_DECIBELS);
+    thresholdSlider.setDoubleClickReturnValue(true, 0.0f);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearBarVertical);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::NoTextBox, true, 10, 10);
     thresholdSlider.setLookAndFeel(&thresholdSliderLAF);
-    // add and make slider visible
     addAndMakeVisible(thresholdSlider);
     
     float initialThresholdValue = vt.getProperty(IDs::thresholdValue);
@@ -1209,6 +1208,8 @@ StereoImageMeter::StereoImageMeter(juce::ValueTree _vt, juce::AudioBuffer<float>
     
     addAndMakeVisible(goniometer);
     addAndMakeVisible(correlationMeter);
+    
+    goniometer.setScale( vt.getProperty(IDs::goniometerScale) );
 }
 
 void StereoImageMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Identifier& _ID)
@@ -1340,6 +1341,7 @@ void PFM10AudioProcessorEditor::initMenus()
     goniometerScaleRotarySlider.setTooltip("Goniometer Scale");
     goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
     goniometerScaleRotarySlider.getValueObject().referTo(valueTree.getPropertyAsValue(IDs::goniometerScale, nullptr));
+    goniometerScaleRotarySlider.setDoubleClickReturnValue(true, 1.0f);
     addAndMakeVisible(goniometerScaleRotarySlider);
 }
 

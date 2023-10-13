@@ -300,7 +300,7 @@ private:
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
-    float scale { 1.f };
+    float scale;
 
     void buildBackground(juce::Graphics& g);
 };
