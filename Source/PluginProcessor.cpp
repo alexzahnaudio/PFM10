@@ -19,9 +19,11 @@ PFM10AudioProcessor::PFM10AudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
 #endif
+       valueTree(IDs::root)
 {
+    initDefaultValueTree(valueTree);
 }
 
 PFM10AudioProcessor::~PFM10AudioProcessor()
@@ -196,15 +198,65 @@ void PFM10AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    
+    juce::MemoryOutputStream outputStream = juce::MemoryOutputStream(destData, false);
+    
+    valueTree.writeToStream(outputStream);
+    
+    DBG("Wrote value tree state to memory:\n" << valueTree.toXmlString() << '\n');
 }
 
 void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    
+    juce::ValueTree loadedTree = juce::ValueTree::readFromData(data, static_cast<size_t>(sizeInBytes));
+    
+    if (loadedTree.isValid() && hasNeededProperties(loadedTree))
+    {
+        DBG("Loaded value tree state:\n" << loadedTree.toXmlString() << '\n');
+        
+        valueTree.copyPropertiesAndChildrenFrom(loadedTree, nullptr);
+        
+        DBG("Value tree state:\n" << valueTree.toXmlString() << '\n');
+    }
+    else
+    {
+        // Do nothing. Do not overwrite the value tree's default values.
+    }
 }
 
 //==============================================================================
+
+void PFM10AudioProcessor::initDefaultValueTree (juce::ValueTree& tree)
+{
+    // Set Up Properties using Identifiers
+    tree.setProperty(IDs::thresholdValue,    DefaultPropertyValues::thresholdValue,    nullptr);
+    tree.setProperty(IDs::decayRate,         DefaultPropertyValues::decayRate,         nullptr);
+    tree.setProperty(IDs::averagerIntervals, DefaultPropertyValues::averagerIntervals, nullptr);
+    tree.setProperty(IDs::peakHoldEnabled,   DefaultPropertyValues::peakHoldEnabled,   nullptr);
+    tree.setProperty(IDs::peakHoldInf,       DefaultPropertyValues::peakHoldInf,       nullptr);
+    tree.setProperty(IDs::peakHoldDuration,  DefaultPropertyValues::peakHoldDuration,  nullptr);
+    tree.setProperty(IDs::goniometerScale,   DefaultPropertyValues::goniometerScale,   nullptr);
+}
+
+bool PFM10AudioProcessor::hasNeededProperties (juce::ValueTree& tree)
+{
+    if (! tree.hasProperty(IDs::thresholdValue))    return false;
+    if (! tree.hasProperty(IDs::decayRate))         return false;
+    if (! tree.hasProperty(IDs::averagerIntervals)) return false;
+    if (! tree.hasProperty(IDs::peakHoldEnabled))   return false;
+    if (! tree.hasProperty(IDs::peakHoldInf))       return false;
+    if (! tree.hasProperty(IDs::peakHoldDuration))  return false;
+    if (! tree.hasProperty(IDs::goniometerScale))   return false;
+    if (! tree.hasProperty(IDs::decayRate))         return false;
+    
+    return true;
+}
+
+//==============================================================================
+
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {

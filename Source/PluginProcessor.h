@@ -13,6 +13,8 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include "Identifiers.h"
+#include "DefaultPropertyValues.h"
 
 template<typename T, size_t Size>           // T will be juce::AudioBuffer<float>
 struct Fifo
@@ -113,9 +115,14 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
     
     //==============================================================================
+    juce::ValueTree valueTree;
     Fifo<juce::AudioBuffer<float>, 6> audioBufferFifo;
 
 private:
+    //==============================================================================
+    void initDefaultValueTree (juce::ValueTree& tree);
+    bool hasNeededProperties (juce::ValueTree& tree);
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PFM10AudioProcessor)
     
