@@ -39,7 +39,7 @@ struct Fifo
         auto scopedWrite = abstractFifo.write(1);
         if (scopedWrite.blockSize1 > 0)
         {
-            buffers[scopedWrite.startIndex1] = t;
+            buffers[static_cast<size_t>(scopedWrite.startIndex1)] = t;
             return true;
         }
         return false;
@@ -50,7 +50,7 @@ struct Fifo
         auto scopedRead = abstractFifo.read(1);
         if (scopedRead.blockSize1 > 0)
         {
-            t = buffers[scopedRead.startIndex1];
+            t = buffers[static_cast<size_t>(scopedRead.startIndex1)];
             return true;
         }
         return false;

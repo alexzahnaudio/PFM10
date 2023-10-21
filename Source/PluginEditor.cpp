@@ -16,9 +16,9 @@
 
 void LAF_ThresholdSlider::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
                                            float sliderPos,
-                                           float minSliderPos,
-                                           float maxSliderPos,
-                                           const juce::Slider::SliderStyle style,
+                                           __attribute__((unused)) float minSliderPos,
+                                           __attribute__((unused)) float maxSliderPos,
+                                           __attribute__((unused)) const juce::Slider::SliderStyle style,
                                            juce::Slider& slider)
 {
     // This Look-And-Feel class is designed specifically for linear-bar style sliders!
@@ -69,7 +69,6 @@ void Averager<T>::clear(T initialValue)
     writeIndex = 0;
     avg = initialValue;
     sum = static_cast<T>(initialValue * numElements);
-    
 }
 
 template<typename T>
@@ -119,21 +118,27 @@ void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const j
 {
     if (_ID == IDs::decayRate)
     {
-        float decayRate = _vt.getProperty(IDs::decayRate);
+        int decayRate = _vt.getProperty(IDs::decayRate);
         
         setDecayRate(decayRate);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldDuration)
     {
         int newHoldDuration = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldTime(newHoldDuration);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldInf)
     {
         bool isInfiniteHoldEnabled = _vt.getProperty(IDs::peakHoldInf);
         
         setHoldForInf(isInfiniteHoldEnabled);
+        
+        return;
     }
 }
 
@@ -161,10 +166,10 @@ void DecayingValueHolder::setHoldTime(int ms)
     holdTimeMs = ms;
 }
 
-void DecayingValueHolder::setDecayRate(float dbPerSec)
+void DecayingValueHolder::setDecayRate(int dbPerSec)
 {
     // note: getTimerInterval() returns milliseconds
-    decayRatePerFrame = dbPerSec * getTimerInterval() / 1000;
+    decayRatePerFrame = static_cast<float>(dbPerSec) * getTimerInterval() / 1000;
 }
 
 void DecayingValueHolder::setHoldForInf(bool b)
@@ -178,7 +183,7 @@ void DecayingValueHolder::timerCallback()
 {
     juce::int64 now = getNow();
     
-    if (!holdForInf)
+    if (! holdForInf)
     {
         if ((now - peakTime) > holdTimeMs)
         {
@@ -224,18 +229,24 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         int newHoldDurationMs = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldDuration(newHoldDurationMs);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldEnabled)
     {
         bool b = _vt.getProperty(IDs::peakHoldEnabled);
         
         setHoldEnabled(b);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldInf)
     {
         bool b = _vt.getProperty(IDs::peakHoldInf);
         
         setHoldForInf(b);
+        
+        return;
     }
 }
 
@@ -244,7 +255,7 @@ void ValueHolder::timerCallback()
     juce::int64 now = juce::Time::currentTimeMillis();
     juce::int64 elapsed = now - timeOfPeak;
     
-    if (!holdForInf && elapsed > durationToHoldForMs)
+    if (! holdForInf && elapsed > durationToHoldForMs)
     {
         heldValue = currentValue;
         isOverThreshold = (heldValue > threshold);
@@ -551,7 +562,7 @@ void DbScale::buildBackgroundImage(int dbDivision,
     {
         int tickInt = static_cast<int>(tick.db);
         std::string tickString = std::to_string(tickInt);
-        if(tickInt > 0) tickString.insert(0,"+");
+        if(tickInt > 0) tickString.insert(0, "+");
         
         // NOTE: the text shifts downward by (height) pixels, but the text
         //       disappears if height is set to 0. This is causing the ticks to
@@ -564,8 +575,6 @@ void DbScale::buildBackgroundImage(int dbDivision,
                                            1,                       //height
                                            juce::Justification::centred,
                                            1);                      //max num lines
-        
-        //DBG(tickString << " at y position " << std::to_string(tick.y));
     }
 }
 
@@ -613,6 +622,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.updateThreshold(dbLevel);
         rightMacroMeter.updateThreshold(dbLevel);
+        
+        return;
     }
     else if (_ID == IDs::averagerIntervals)
     {
@@ -620,6 +631,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
         rightMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldEnabled)
     {
@@ -627,6 +640,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
         rightMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
+        
+        return;
     }
 }
 
@@ -641,7 +656,7 @@ void StereoMeter::resized()
     auto bounds = getLocalBounds();
     auto height = bounds.getHeight();
     int macroMeterWidth = 40;
-    int macroMeterHeight = height-30;
+    int macroMeterHeight = height - 30;
     
     leftMacroMeter.setTopLeftPosition(0, 0);
     leftMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
@@ -649,18 +664,18 @@ void StereoMeter::resized()
     dbScale.setBounds(leftMacroMeter.getRight(),
                       leftMacroMeter.getY(),
                       30,
-                      leftMacroMeter.getHeight()+50);
+                      leftMacroMeter.getHeight() + 50);
     dbScale.buildBackgroundImage(6, //db division
                                  leftMacroMeter.getBounds().withTrimmedTop(leftMacroMeter.getTextHeight()),
                                  NEGATIVE_INFINITY,
                                  MAX_DECIBELS);
     
-    rightMacroMeter.setTopLeftPosition(leftMacroMeter.getRight()+dbScale.getWidth(), 0);
+    rightMacroMeter.setTopLeftPosition(leftMacroMeter.getRight() + dbScale.getWidth(), 0);
     rightMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
     
     label.setBounds(leftMacroMeter.getX(),
-                    leftMacroMeter.getBottom()+10,
-                    rightMacroMeter.getRight()-leftMacroMeter.getX(),
+                    leftMacroMeter.getBottom() + 10,
+                    rightMacroMeter.getRight() - leftMacroMeter.getX(),
                     50);
     label.setJustificationType(juce::Justification(12)); // top-centered
     
@@ -709,7 +724,7 @@ void ReadAllAfterWriteCircularBuffer<T>::write(T t)
     
     data[writeIndexCached] = t;
     
-    writeIndexCached = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+    writeIndexCached = (writeIndexCached == sizeCached - 1) ? 0 : writeIndexCached + 1;
     
     writeIndex = writeIndexCached;
 }
@@ -726,7 +741,7 @@ size_t ReadAllAfterWriteCircularBuffer<T>::getReadIndex() const
     size_t writeIndexCached = writeIndex;
     size_t sizeCached = getSize();
     
-    size_t readIndex = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+    size_t readIndex = (writeIndexCached == sizeCached - 1) ? 0 : writeIndexCached + 1;
         
     return readIndex;
 }
@@ -831,19 +846,19 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
     
     auto map = [=](float db)
     {
-        float result = juce::jmap(db,NEGATIVE_INFINITY,MAX_DECIBELS,bottom,0.f);
+        float result = juce::jmap(db, NEGATIVE_INFINITY, MAX_DECIBELS, bottom, 0.f);
         return result;
     };
     
     auto incrementAndWrap = [=](std::size_t readIndex)
     {
-        return (readIndex == bufferSizeCached-1) ? 0 : readIndex+1;
+        return (readIndex == bufferSizeCached - 1) ? 0 : readIndex + 1;
     };
             
     p.startNewSubPath(0, map(dataCached[readIndexCached]));
     readIndexCached = incrementAndWrap(readIndexCached);
         
-    for (size_t x = 1; x < bufferSizeCached-1; ++x)
+    for (size_t x = 1; x < bufferSizeCached - 1; ++x)
     {
         p.lineTo(x, map(dataCached[readIndexCached]));
         readIndexCached = incrementAndWrap(readIndexCached);
@@ -877,9 +892,9 @@ void Goniometer::resized()
 {
     w = getWidth();
     h = getHeight();
-    center = juce::Point<int>( w/2, h/2 );
+    center = juce::Point<int>( w / 2, h / 2 );
     diameter = ((w > h) ? h : w) - 35;      // 35 pixels shorter than the smaller dimension
-    radius = diameter/2;
+    radius = diameter / 2;
     
     backgroundImage = juce::Image(juce::Image::ARGB, w, h, true);
     juce::Graphics g(backgroundImage);
@@ -954,10 +969,10 @@ void Goniometer::buildBackground(juce::Graphics &g)
     // S+
     g.drawText(axisLabels[0],
                center.getX() - radiusInt - axisLabelSize,
-               center.getY() - axisLabelSize/2,
+               center.getY() - axisLabelSize / 2,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(34)); // centered right
+               juce::Justification::centredRight);
     
     // L
     g.drawText(axisLabels[1],
@@ -965,15 +980,15 @@ void Goniometer::buildBackground(juce::Graphics &g)
                center.getY() - radiusDotOrthoInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(18)); // bottom right
+               juce::Justification::bottomRight);
     
     // M
     g.drawText(axisLabels[2],
-               center.getX() - axisLabelSize/2,
+               center.getX() - axisLabelSize / 2,
                center.getY() - radiusInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(20)); // bottom center
+               juce::Justification::centredBottom);
     
     // R
     g.drawText(axisLabels[3],
@@ -981,15 +996,15 @@ void Goniometer::buildBackground(juce::Graphics &g)
                center.getY() - radiusDotOrthoInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(17)); // bottom left
+               juce::Justification::bottomLeft);
     
     // S-
     g.drawText(axisLabels[4],
                center.getX() + radiusInt,
-               center.getY() - axisLabelSize/2,
+               center.getY() - axisLabelSize / 2,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(33)); // centered left
+               juce::Justification::centredLeft);
 }
 
 void Goniometer::paint(juce::Graphics &g)
@@ -1047,7 +1062,7 @@ void Goniometer::paint(juce::Graphics &g)
         else
         {
             // Final sample in buffer gets a pretty dot for a sort of glowing-datapoint effect
-            if (i == numSamples-1)
+            if (i == numSamples - 1)
             {
                 g.setColour(juce::Colours::antiquewhite);
                 g.fillEllipse(centerX + sideMapped - 2,
@@ -1063,7 +1078,7 @@ void Goniometer::paint(juce::Graphics &g)
             // Transparency scales from 0.5 to 1.0 as the buffer is traversed
             opacity = juce::jmap(static_cast<float>(i),
                                  1.f,
-                                 static_cast<float>(numSamples)-1,
+                                 static_cast<float>(numSamples) - 1,
                                  0.5f,
                                  1.0f);
                                     
@@ -1095,7 +1110,6 @@ CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sa
     for (juce::dsp::FIR::Filter<float> &filter : filters)
     {
         filter = juce::dsp::FIR::Filter<float>(coefficientsPtr);
-
     }
 }
 
@@ -1171,7 +1185,7 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
     
     int averageMapped = static_cast<int>(juce::jmap(abs(average),
                                                     0.f,
-                                                    width/2.f));
+                                                    width / 2.f));
     
     g.setColour(juce::Colours::orange);
     if (average < 0)
@@ -1228,6 +1242,7 @@ void StereoImageMeter::resized()
                                  0.f,
                                  1.f,
                                  gonioToCorrMeterHeightRatio);
+    
     correlationMeter.setBoundsRelative(0.f,
                                        gonioToCorrMeterHeightRatio,
                                        1.f,

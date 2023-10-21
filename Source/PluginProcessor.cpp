@@ -79,21 +79,21 @@ int PFM10AudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void PFM10AudioProcessor::setCurrentProgram (int index)
+void PFM10AudioProcessor::setCurrentProgram (__attribute__((unused)) int index)
 {
 }
 
-const juce::String PFM10AudioProcessor::getProgramName (int index)
+const juce::String PFM10AudioProcessor::getProgramName (__attribute__((unused)) int index)
 {
     return {};
 }
 
-void PFM10AudioProcessor::changeProgramName (int index, const juce::String& newName)
+void PFM10AudioProcessor::changeProgramName (__attribute__((unused)) int index, __attribute__((unused)) const juce::String& newName)
 {
 }
 
 //==============================================================================
-void PFM10AudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void PFM10AudioProcessor::prepareToPlay (__attribute__((unused)) double sampleRate, int samplesPerBlock)
 {
     audioBufferFifo.prepare(samplesPerBlock, getTotalNumOutputChannels());
     
@@ -140,7 +140,7 @@ bool PFM10AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 }
 #endif
 
-void PFM10AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void PFM10AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, __attribute__((unused)) juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
@@ -202,8 +202,6 @@ void PFM10AudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     juce::MemoryOutputStream outputStream = juce::MemoryOutputStream(destData, false);
     
     valueTree.writeToStream(outputStream);
-    
-    DBG("Wrote value tree state to memory:\n" << valueTree.toXmlString() << '\n');
 }
 
 void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -215,11 +213,7 @@ void PFM10AudioProcessor::setStateInformation (const void* data, int sizeInBytes
     
     if (loadedTree.isValid() && hasNeededProperties(loadedTree))
     {
-        DBG("Loaded value tree state:\n" << loadedTree.toXmlString() << '\n');
-        
         valueTree.copyPropertiesAndChildrenFrom(loadedTree, nullptr);
-        
-        DBG("Value tree state:\n" << valueTree.toXmlString() << '\n');
     }
     else
     {
