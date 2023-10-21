@@ -1292,6 +1292,7 @@ void PFM10AudioProcessorEditor::initMenus()
     // Decay Rate Menu
     
     decayRateMenuLabel.setJustificationType(juce::Justification::centred);
+    decayRateMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(decayRateMenuLabel);
     
     decayRateMenu.addItem("-3dB/s",  DB_PER_SEC_3);
@@ -1302,11 +1303,13 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.setTooltip("Peak Marker Decay Rate");
     decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
     decayRateMenu.setSelectedId( decayRateMenuSelectByValue(valueTree.getProperty(IDs::decayRate)) );
+    decayRateMenu.setBufferedToImage(true);
     addAndMakeVisible(decayRateMenu);
     
     // Averager Duration Menu
     
     averagerDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    averagerDurationMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(averagerDurationMenuLabel);
 
     averagerDurationMenu.addItem("100ms",  AVERAGER_DURATION_MS_100);
@@ -1317,11 +1320,13 @@ void PFM10AudioProcessorEditor::initMenus()
     averagerDurationMenu.setTooltip("Averaging duration for RMS meters");
     averagerDurationMenu.onChange = [this] { onAveragerDurationMenuChanged(); };
     averagerDurationMenu.setSelectedId( averagerDurationMenuSelectByValue(valueTree.getProperty(IDs::averagerIntervals)) );
+    averagerDurationMenu.setBufferedToImage(true);
     addAndMakeVisible(averagerDurationMenu);
     
     // Peak Hold Duration Menu
     
     peakHoldDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    peakHoldDurationMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(peakHoldDurationMenuLabel);
 
     peakHoldDurationMenu.addItem("0s",   PEAK_HOLD_DURATION_MS_0);
@@ -1333,6 +1338,7 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldDurationMenu.setTooltip("Peak hold duration for meters");
     peakHoldDurationMenu.onChange = [this] { onPeakHoldDurationMenuChanged(); };
     peakHoldDurationMenu.setSelectedId( peakHoldDurationMenuSelectByValueTree(valueTree) );
+    peakHoldDurationMenu.setBufferedToImage(true);
     addAndMakeVisible(peakHoldDurationMenu);
     
     // Peak Hold Reset Button
@@ -1340,11 +1346,13 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldResetButton.setButtonText("Reset Hold");
     peakHoldResetButton.onClick = [this] { onPeakHoldResetButtonClicked(); };
     peakHoldResetButton.setVisible( valueTree.getProperty(IDs::peakHoldInf) );
+    peakHoldResetButton.setBufferedToImage(true);
     addAndMakeVisible(peakHoldResetButton);
     
     // Goniometer Scale Rotary Slider
     
     goniometerScaleRotarySliderLabel.setJustificationType(juce::Justification::centred);
+    goniometerScaleRotarySliderLabel.setBufferedToImage(true);
     addAndMakeVisible(goniometerScaleRotarySliderLabel);
 
     goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
@@ -1357,6 +1365,7 @@ void PFM10AudioProcessorEditor::initMenus()
     goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
     goniometerScaleRotarySlider.getValueObject().referTo(valueTree.getPropertyAsValue(IDs::goniometerScale, nullptr));
     goniometerScaleRotarySlider.setDoubleClickReturnValue(true, 1.0f);
+    goniometerScaleRotarySlider.setBufferedToImage(true);
     addAndMakeVisible(goniometerScaleRotarySlider);
 }
 
