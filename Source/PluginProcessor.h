@@ -117,6 +117,11 @@ public:
     //==============================================================================
     juce::ValueTree valueTree;
     Fifo<juce::AudioBuffer<float>, 6> audioBufferFifo;
+    
+    //==============================================================================
+#if PERFETTO
+    std::unique_ptr<perfetto::TracingSession> tracingSession;
+#endif
 
 private:
     //==============================================================================

@@ -23,11 +23,18 @@ PFM10AudioProcessor::PFM10AudioProcessor()
 #endif
        valueTree(IDs::root)
 {
+#if PERFETTO
+    MelatoninPerfetto::get().beginSession();
+#endif
+    
     initDefaultValueTree(valueTree);
 }
 
 PFM10AudioProcessor::~PFM10AudioProcessor()
 {
+#if PERFETTO
+    MelatoninPerfetto::get().endSession();
+#endif
 }
 
 //==============================================================================

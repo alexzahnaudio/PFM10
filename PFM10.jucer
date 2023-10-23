@@ -2,9 +2,15 @@
 
 <JUCERPROJECT id="CtkhAc" name="PFM10" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="17"
-              pluginManufacturer="Alex Zahn" companyName="Alex Zahn" pluginVST3Category="Analyzer,Fx,Stereo">
+              pluginManufacturer="Alex Zahn" companyName="Alex Zahn" pluginVST3Category="Analyzer,Fx,Stereo"
+              headerPath="/Users/alex/JUCE Programming/perfetto/sdk" compilerFlagSchemes="NewScheme"
+              defines="PERFETTO=1">
   <MAINGROUP id="IySNap" name="PFM10">
     <GROUP id="{A43200F0-3857-9F76-C832-2120F6D8DF76}" name="Source">
+      <FILE id="FXWYC5" name="perfetto.cc" compile="1" resource="0" file="../perfetto/sdk/perfetto.cc"/>
+      <FILE id="nbVSt0" name="perfetto.h" compile="0" resource="0" file="../perfetto/sdk/perfetto.h"/>
+      <FILE id="wsbqvJ" name="DefaultPropertyValues.h" compile="0" resource="0"
+            file="Source/DefaultPropertyValues.h"/>
       <FILE id="fj3LjQ" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="c01JGR" name="PluginProcessor.h" compile="0" resource="0"
@@ -12,6 +18,7 @@
       <FILE id="IR2Kpx" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="HWAkkO" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="rQvLJd" name="Identifiers.h" compile="0" resource="0" file="Source/Identifiers.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
@@ -36,6 +43,7 @@
         <MODULEPATH id="juce_graphics" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../JUCE/modules"/>
+        <MODULEPATH id="melatonin_perfetto" path="../../JUCE/user_modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -54,5 +62,6 @@
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="melatonin_perfetto" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
   </MODULES>
 </JUCERPROJECT>
