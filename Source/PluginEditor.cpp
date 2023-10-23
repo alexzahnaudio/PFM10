@@ -490,18 +490,14 @@ void DbScale::paint(juce::Graphics &g)
     g.drawImage(bkgd, getLocalBounds().toFloat());
 }
 
-std::vector<Tick> DbScale::getTicks(int dbDivision,
-                       juce::Rectangle<int> meterBounds,
-                       int minDb, int maxDb)
+std::vector<Tick> DbScale::getTicks(int dbDivision, juce::Rectangle<int> meterBounds, int minDb, int maxDb)
 {
     if(minDb > maxDb)
     {
         DBG("Warning! DbScale minDb is greater than maxDb (in function getTicks)! Swapping them.");
         std::swap(minDb, maxDb);
     }
-    
-    //u_int numTicks = static_cast<u_int>( ((maxDb - minDb) / dbDivision) + 1);
-    
+        
     auto ticks = std::vector<Tick>();
     
     for(int db = minDb; db <= maxDb; db += dbDivision)
@@ -549,9 +545,6 @@ void DbScale::buildBackgroundImage(int dbDivision,
     auto bkgdGraphicsContext = juce::Graphics(bkgd);
     bkgdGraphicsContext.addTransform(globalScaleFactorTransform);
     
-    // For debugging purposes:
-    //bkgdGraphicsContext.fillAll(juce::Colours::black);
-    
     std::vector<Tick> ticks = getTicks(dbDivision,
                                        meterBounds,
                                        minDb,
@@ -593,6 +586,7 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     addAndMakeVisible(dbScale);
     
     label.setText("L  " + _meterName + "  R", juce::dontSendNotification);
+    label.setBufferedToImage(true);
     addAndMakeVisible(label);
     
     // update value tree when threshold slider value is changed, and vice versa
@@ -657,6 +651,7 @@ void StereoMeter::resized()
     auto height = bounds.getHeight();
     int macroMeterWidth = 40;
     int macroMeterHeight = height - 30;
+    int dbDivision = 6;
     
     leftMacroMeter.setTopLeftPosition(0, 0);
     leftMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
@@ -665,7 +660,7 @@ void StereoMeter::resized()
                       leftMacroMeter.getY(),
                       30,
                       leftMacroMeter.getHeight() + 50);
-    dbScale.buildBackgroundImage(6, //db division
+    dbScale.buildBackgroundImage(dbDivision,
                                  leftMacroMeter.getBounds().withTrimmedTop(leftMacroMeter.getTextHeight()),
                                  NEGATIVE_INFINITY,
                                  MAX_DECIBELS);
@@ -677,7 +672,7 @@ void StereoMeter::resized()
                     leftMacroMeter.getBottom() + 10,
                     rightMacroMeter.getRight() - leftMacroMeter.getX(),
                     50);
-    label.setJustificationType(juce::Justification(12)); // top-centered
+    label.setJustificationType(juce::Justification::centredTop);
     
     thresholdSlider.setBounds(dbScale.getX(),
                               leftMacroMeter.getTextHeight(),
@@ -901,7 +896,6 @@ void Goniometer::resized()
     buildBackground(g);
 }
 
-
 void Goniometer::buildBackground(juce::Graphics &g)
 {
     juce::Array<juce::String> axisLabels{"+S", "L", "M", "R", "-S"};
@@ -1021,6 +1015,7 @@ void Goniometer::paint(juce::Graphics &g)
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
     int numSamples = buffer.getNumSamples();
+    int finalSampleIndex = numSamples - 1;
         
     g.drawImageAt(backgroundImage, 0, 0);
     
@@ -1062,7 +1057,7 @@ void Goniometer::paint(juce::Graphics &g)
         else
         {
             // Final sample in buffer gets a pretty dot for a sort of glowing-datapoint effect
-            if (i == numSamples - 1)
+            if (i == finalSampleIndex)
             {
                 g.setColour(juce::Colours::antiquewhite);
                 g.fillEllipse(centerX + sideMapped - 2,
