@@ -879,8 +879,22 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
 Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
     : buffer(_buffer)
 {
-    internalBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+    int numChannels = buffer.getNumChannels();
+    int numSamples = buffer.getNumSamples();
+    
+    internalBuffer.setSize(numChannels, numSamples);
     internalBuffer.clear();
+    
+    opacities.resize( static_cast<size_t>(numSamples), 0 );
+    
+    for (size_t i = 0; i < static_cast<size_t>(numSamples); ++i)
+    {
+        opacities[i] = juce::jmap(static_cast<float>(i),
+                                  0.0f,
+                                  static_cast<float>(numSamples - 1),
+                                  0.5f,
+                                  1.0f);
+    }
 }
 
 void Goniometer::resized()
@@ -1010,13 +1024,12 @@ void Goniometer::paint(juce::Graphics &g)
           midMapped,
           sideMapped,
           previousMidMapped = 0.f,
-          previousSideMapped = 0.f,
-          opacity = 0.f;
+          previousSideMapped = 0.f;
     float centerX = static_cast<float>(center.getX());
     float centerY = static_cast<float>(center.getY());
     int numSamples = buffer.getNumSamples();
     int finalSampleIndex = numSamples - 1;
-        
+    
     g.drawImageAt(backgroundImage, 0, 0);
     
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
@@ -1069,14 +1082,8 @@ void Goniometer::paint(juce::Graphics &g)
             p.clear();
             p.startNewSubPath(centerX + previousSideMapped, centerY + previousMidMapped);
             p.lineTo(centerX + sideMapped, centerY + midMapped);
-                        
-            // Transparency scales from 0.5 to 1.0 as the buffer is traversed
-            opacity = juce::jmap(static_cast<float>(i),
-                                 1.f,
-                                 static_cast<float>(numSamples) - 1,
-                                 0.5f,
-                                 1.0f);
                                     
+            float opacity = opacities[static_cast<size_t>(i)];
             g.setColour(juce::Colour(0.1f, 0.3f, opacity, opacity));
             g.strokePath(p, juce::PathStrokeType(2.f));
             

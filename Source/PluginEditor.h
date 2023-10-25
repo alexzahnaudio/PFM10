@@ -297,6 +297,7 @@ private:
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
     juce::Path p;
+    std::vector<float> opacities;
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
