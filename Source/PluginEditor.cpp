@@ -1022,13 +1022,14 @@ void Goniometer::paint(juce::Graphics &g)
           mid,
           side,
           midMapped,
-          sideMapped,
-          previousMidMapped = 0.f,
-          previousSideMapped = 0.f;
-    float centerX = static_cast<float>(center.getX());
-    float centerY = static_cast<float>(center.getY());
+          sideMapped;
+    float radiusSquared = radius * radius;
+    juce::Point<float> centerFloat(center.toFloat());
+    juce::Point<float> vertex;
+    std::stack<juce::Point<float>> clippedPoints;
     int numSamples = buffer.getNumSamples();
-    int finalSampleIndex = numSamples - 1;
+    
+    p.clear();
     
     g.drawImageAt(backgroundImage, 0, 0);
     
@@ -1037,11 +1038,25 @@ void Goniometer::paint(juce::Graphics &g)
     
     for (int i = 0; i < numSamples; ++i)
     {
-        leftSample = internalBuffer.getSample(0, i) * scale;
-        rightSample = internalBuffer.getSample(1, i) * scale;
+        leftSample  = internalBuffer.getSample(0, i);
+        rightSample = internalBuffer.getSample(1, i);
+        
+        if (std::isnan(leftSample) || std::isinf(leftSample))
+        {
+            leftSample = 0.0f;
+            DBG("Invalid sample detected in buffer.");
+        }
+        if (std::isnan(rightSample) || std::isinf(rightSample))
+        {
+            rightSample = 0.0f;
+            DBG("Invalid sample detected in buffer.");
+        }
+        
+        leftSample  *= scale;
+        rightSample *= scale;
 
-        //mult by invsqrt(2) gives us half power or -3dB
-        mid = (leftSample + rightSample) * INV_SQRT_OF_2;
+        // Multiplying by invsqrt(2) gives us half power or -3dB
+        mid  = (leftSample + rightSample) * INV_SQRT_OF_2;
         side = (leftSample - rightSample) * INV_SQRT_OF_2;
                 
         midMapped = juce::jmap(mid,
@@ -1055,41 +1070,42 @@ void Goniometer::paint(juce::Graphics &g)
                                 -radius,
                                 radius);
         
-        if (   std::isnan(leftSample) || std::isnan(rightSample)
-            || std::isinf(leftSample) || std::isinf(rightSample))
+        vertex.setXY(sideMapped, midMapped);
+        
+        if (vertex.getDistanceSquaredFromOrigin() > radiusSquared)
         {
-            midMapped = previousMidMapped;
-            sideMapped = previousSideMapped;
-        }
+            vertex *= radius / vertex.getDistanceFromOrigin();
+            vertex += centerFloat;
             
-        if (i == 0)
-        {
-            previousMidMapped = midMapped;
-            previousSideMapped = sideMapped;
+            clippedPoints.push(vertex);
         }
         else
         {
-            // Final sample in buffer gets a pretty dot for a sort of glowing-datapoint effect
-            if (i == finalSampleIndex)
-            {
-                g.setColour(juce::Colours::antiquewhite);
-                g.fillEllipse(centerX + sideMapped - 2,
-                              centerY + midMapped - 2,
-                              4,
-                              4);
-            }
-            
-            p.clear();
-            p.startNewSubPath(centerX + previousSideMapped, centerY + previousMidMapped);
-            p.lineTo(centerX + sideMapped, centerY + midMapped);
-                                    
-            float opacity = opacities[static_cast<size_t>(i)];
-            g.setColour(juce::Colour(0.1f, 0.3f, opacity, opacity));
-            g.strokePath(p, juce::PathStrokeType(2.f));
-            
-            previousMidMapped = midMapped;
-            previousSideMapped = sideMapped;
+            vertex += centerFloat;
         }
+                    
+        if (i == 0)
+        {
+            p.startNewSubPath(vertex);
+        }
+        else
+        {
+            p.lineTo(vertex);
+        }
+    }
+    
+    g.setColour(juce::Colours::antiquewhite);
+    g.strokePath(p, juce::PathStrokeType(2.0f));
+    
+    g.setColour(juce::Colours::red);
+        
+    juce::Point<float> pt;
+    
+    for (unsigned int i = 0; i < clippedPoints.size(); ++i)
+    {
+        pt = clippedPoints.top();
+        g.fillEllipse(pt.x, pt.y, 4.0f, 4.0f);
+        clippedPoints.pop();
     }
 }
 
