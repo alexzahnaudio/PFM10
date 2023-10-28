@@ -276,12 +276,18 @@ private:
     juce::Path path;
     float dbThreshold { 0 };
     juce::ColourGradient histogramColourGradient;
+    
     const juce::String title;
+    juce::Image titleImage;
+    juce::Point<int> titleImagePosition;
+    const int titleWidth { 64 };
+    const int titleHeight { 16 };
     
     void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
     static juce::Path buildPath(juce::Path& p,
                           ReadAllAfterWriteCircularBuffer<float>& buffer,
                           juce::Rectangle<float> bounds);
+    void buildTitleImage(juce::Graphics& g);
 };
 
 //MARK: - Goniometer

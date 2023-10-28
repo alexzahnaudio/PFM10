@@ -779,14 +779,26 @@ void Histogram::paint(juce::Graphics &g)
 
     displayPath(g, localBounds);
     
-    g.setColour(juce::Colours::white);
-    g.drawText(title, localBounds, juce::Justification(20)); //bottom-centered
+    g.drawImageAt(titleImage, titleImagePosition.x, titleImagePosition.y);
 }
 
 void Histogram::resized()
 {
     // use component width for buffer size
     buffer.resize(static_cast<size_t>(getWidth()), NEGATIVE_INFINITY);
+    
+    titleImage = juce::Image(juce::Image::ARGB, titleWidth, titleHeight, true);
+    juce::Graphics g(titleImage);
+    buildTitleImage(g);
+    
+    titleImagePosition.setXY( getLocalBounds().getCentreX() - titleWidth/2, getLocalBounds().getBottom() - titleHeight );
+}
+
+void Histogram::buildTitleImage(juce::Graphics &g)
+{
+    g.setColour(juce::Colours::white);
+    g.setFont(16.0f);
+    g.drawText(title, 0, 0, titleWidth, titleHeight, juce::Justification::centredBottom);
 }
 
 void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
