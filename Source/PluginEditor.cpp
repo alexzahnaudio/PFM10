@@ -1145,29 +1145,56 @@ CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sa
 
 void CorrelationMeter::paint(juce::Graphics &g)
 {
-    juce::Rectangle<int> meterArea = getLocalBounds()
-    .withTrimmedBottom(20)
-    .withTrimmedLeft(10)
-    .withTrimmedRight(10);
-    
-    float slowMeterHeightPercentage = 0.75f;
+    TRACE_COMPONENT();
     
     // Skinny peak-average meter on top
     drawAverage(g,
-                meterArea.withTrimmedBottom(static_cast<int>( meterArea.getHeight() * slowMeterHeightPercentage )),
+                peakMeterArea,
                 peakAverager.getAvg(),
                 true);
     // Thicker slow-average meter on bottom
     drawAverage(g,
-                meterArea.withTrimmedTop(static_cast<int>( meterArea.getHeight() * (1 - slowMeterHeightPercentage) )),
+                slowMeterArea,
                 slowAverager.getAvg(),
                 true);
     
-    // Text Labels
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter text");
+    g.drawImageAt(labelsImage, labelsImageArea.getX(), labelsImageArea.getY());
+    TRACE_EVENT_END("component");
+}
+
+void CorrelationMeter::resized()
+{
+    juce::Rectangle<int> localBounds = getLocalBounds();
+    
+    meterArea = localBounds
+    .withTrimmedBottom(20)
+    .withTrimmedLeft(10)
+    .withTrimmedRight(10);
+    
+    int meterAreaHeight = meterArea.getHeight();
+    
+    peakMeterArea = meterArea.withTrimmedBottom( static_cast<int>(meterAreaHeight * slowMeterHeightPercentage) );
+    
+    slowMeterArea = meterArea.withTrimmedTop( static_cast<int>(meterAreaHeight * (1 - slowMeterHeightPercentage)) );
+    
+    labelsImageArea = getLocalBounds().withTrimmedTop( meterAreaHeight );
+    
+    labelsImage = juce::Image(juce::Image::ARGB, labelsImageArea.getWidth(), labelsImageArea.getHeight(), true);
+    juce::Graphics g(labelsImage);
+    buildLabelsImage(g);
+}
+
+void CorrelationMeter::buildLabelsImage(juce::Graphics &g)
+{
+    juce::Rectangle<int> rect( labelsImageArea.getWidth(), labelsImageArea.getHeight() );
+    
     g.setColour(juce::Colours::white);
-    g.drawText("-1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomLeft));
-    g.drawText("0",  getLocalBounds(), juce::Justification(juce::Justification::Flags::centredBottom));
-    g.drawText("+1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomRight));
+    g.setFont(16.0f);
+    
+    g.drawText("-1", rect, juce::Justification::topLeft);
+    g.drawText("0",  rect, juce::Justification::centredTop);
+    g.drawText("+1", rect, juce::Justification::topRight);
 }
 
 void CorrelationMeter::update()

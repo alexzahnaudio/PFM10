@@ -318,19 +318,27 @@ struct CorrelationMeter : juce::Component
 {
     CorrelationMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
     void paint(juce::Graphics& g) override;
+    void resized() override;
     void update();
 private:
     juce::AudioBuffer<float>& buffer;
-    
     std::array<juce::dsp::FIR::Filter<float>, 3> filters;
-
     Averager<float> slowAverager{1024*4, 0},
                     peakAverager{512, 0};
+    
+    juce::Rectangle<int> meterArea,
+                         peakMeterArea,
+                         slowMeterArea;
+    const float slowMeterHeightPercentage = { 0.75f };
+    
+    juce::Image labelsImage;
+    juce::Rectangle<int> labelsImageArea;
     
     void drawAverage(juce::Graphics& g,
                      juce::Rectangle<int> bounds,
                      float average,
                      bool drawBorder);
+    void buildLabelsImage(juce::Graphics& g);
 };
 
 //MARK: - StereoImageMeter
