@@ -275,7 +275,10 @@ void ValueHolder::setHoldEnabled(bool b)
     if (! b) setHoldDuration(0);
 }
 
-void ValueHolder::updateHeldValue(float v)
+/* Returns true if heldValue is updated (the new value is greater than heldValue).
+   Otherwise return false (heldValue stays the same).
+ */
+bool ValueHolder::updateHeldValue(float v)
 {
     currentValue = v;
     
@@ -284,7 +287,11 @@ void ValueHolder::updateHeldValue(float v)
         timeOfPeak = juce::Time::currentTimeMillis();
         heldValue = v;
         isOverThreshold = (heldValue > threshold);
+        
+        return true;
     }
+    
+    return false;
 }
 
 void ValueHolder::resetHeldValue()
@@ -300,25 +307,17 @@ TextMeter::TextMeter(juce::ValueTree _vt)
 {
     valueHolder.setThreshold(0.f);
     valueHolder.updateHeldValue(NEGATIVE_INFINITY);
+    
+    setOpaque(true);
+    setBufferedToImage(true);
 }
 
 void TextMeter::paint(juce::Graphics &g)
 {
-    juce::Colour textColor = valueHolder.getIsOverThreshold() ? juce::Colours::red : juce::Colours::white;
-    float valueToDisplay = valueHolder.getHeldValue();
-    
-    juce::String textToDisplay;
-    if (valueToDisplay > NEGATIVE_INFINITY)
-    {
-        textToDisplay = juce::String(valueToDisplay, 1).trimEnd();
-    }
-    else
-    {
-        textToDisplay = juce::String("-inf");
-    }
+    TRACE_COMPONENT();
     
     g.fillAll(juce::Colours::black);
-    g.setColour(textColor);
+    g.setColour ( valueHolder.getIsOverThreshold() ? textColorOverThreshold : textColorDefault );
     g.setFont(12.f);
     g.drawFittedText(textToDisplay,
                      getLocalBounds(),
@@ -328,20 +327,44 @@ void TextMeter::paint(juce::Graphics &g)
 
 void TextMeter::update(float valueDb)
 {
-    cachedValueDb = valueDb;
-    valueHolder.updateHeldValue(valueDb);
-    repaint();
+    TRACE_COMPONENT();
+
+    if ( valueHolder.updateHeldValue(valueDb) )
+    {
+        if (valueDb > NEGATIVE_INFINITY)
+        {
+            textToDisplay = juce::String(valueDb, 1).trimEnd();
+        }
+        else
+        {
+            textToDisplay = juce::String("-inf");
+        }
+        
+        TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+        repaint();
+        TRACE_EVENT_END("component");
+    }
 }
 
 void TextMeter::setThreshold(float dbLevel)
 {
     dbThreshold = dbLevel;
     valueHolder.setThreshold(dbLevel);
+    
+    TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+    repaint();
+    TRACE_EVENT_END("component");
 }
 
 void TextMeter::resetHold()
 {
     valueHolder.resetHeldValue();
+    
+    textToDisplay = juce::String("-inf");
+    
+    TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+    repaint();
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================

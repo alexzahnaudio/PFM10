@@ -110,7 +110,7 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     ValueHolder(juce::ValueTree _vt);
     ~ValueHolder() override;
     void setThreshold(float th);
-    void updateHeldValue(float v);
+    bool updateHeldValue(float v);
     void resetHeldValue();
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
     void setHoldEnabled(bool b);
@@ -144,9 +144,11 @@ struct TextMeter : juce::Component
     void setThreshold(float dbLevel);
     void resetHold();
 private:
-    float cachedValueDb;
     ValueHolder valueHolder;
     float dbThreshold { 0 };
+    juce::Colour textColorDefault { juce::Colours::white };
+    juce::Colour textColorOverThreshold { juce::Colours::red };
+    juce::String textToDisplay { "-inf" };
 };
 
 //MARK: - Meter
