@@ -102,6 +102,8 @@ void PFM10AudioProcessor::changeProgramName (__attribute__((unused)) int index, 
 //==============================================================================
 void PFM10AudioProcessor::prepareToPlay (__attribute__((unused)) double sampleRate, int samplesPerBlock)
 {
+    TRACE_DSP();
+    
     audioBufferFifo.prepare(samplesPerBlock, getTotalNumOutputChannels());
     
 #if USE_TEST_OSCILLATOR
@@ -149,6 +151,8 @@ bool PFM10AudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 
 void PFM10AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, __attribute__((unused)) juce::MidiBuffer& midiMessages)
 {
+    TRACE_DSP();
+    
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();

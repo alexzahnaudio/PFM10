@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="17"
               pluginManufacturer="Alex Zahn" companyName="Alex Zahn" pluginVST3Category="Analyzer,Fx,Stereo"
               headerPath="/Users/alex/JUCE Programming/perfetto/sdk" compilerFlagSchemes="NewScheme"
-              defines="PERFETTO=1">
+              defines="PERFETTO=1&#10;JUCE_COREGRAPHICS_DRAW_ASYNC=1&#10;JUCE_COREGRAPHICS_RENDER_WITH_MULTIPLE_PAINT_CALLS=1">
   <MAINGROUP id="IySNap" name="PFM10">
     <GROUP id="{A43200F0-3857-9F76-C832-2120F6D8DF76}" name="Source">
       <FILE id="FXWYC5" name="perfetto.cc" compile="1" resource="0" file="../perfetto/sdk/perfetto.cc"/>

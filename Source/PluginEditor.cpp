@@ -21,6 +21,8 @@ void LAF_ThresholdSlider::drawLinearSlider(juce::Graphics& g, int x, int y, int 
                                            __attribute__((unused)) const juce::Slider::SliderStyle style,
                                            juce::Slider& slider)
 {
+    TRACE_COMPONENT();
+    
     // This Look-And-Feel class is designed specifically for linear-bar style sliders!
     //
     // If you intend to expand this to handle other slider styles, then change this jassert
@@ -374,10 +376,14 @@ Meter::Meter(juce::ValueTree _vt)
 : decayingValueHolder(_vt)
 {
     setPeakHoldEnabled(_vt.getProperty(IDs::peakHoldEnabled));
+    
+    setOpaque(true);
 }
 
 void Meter::paint(juce::Graphics& g)
 {
+    TRACE_EVENT_BEGIN("component", "Meter::paint");
+
     g.fillAll(juce::Colours::black);
     
     juce::Rectangle<float> meterBounds = getLocalBounds().toFloat();
@@ -415,16 +421,23 @@ void Meter::paint(juce::Graphics& g)
     
     g.setColour(juce::Colours::white);
     g.fillRect(peakLevelTickMark);
+    
+    TRACE_EVENT_END("component");
 }
 
 void Meter::update(float dbLevel)
 {
+    TRACE_COMPONENT();
+
     dbPeak = dbLevel;
     if (peakHoldEnabled)
     {
         decayingValueHolder.updateHeldValue(dbPeak);
     }
+    
+    TRACE_EVENT_BEGIN("component", "MeterRepaint");
     repaint();
+    TRACE_EVENT_END("component");
 }
 
 void Meter::resetHold()
@@ -473,6 +486,8 @@ void MacroMeter::resized()
 
 void MacroMeter::updateLevel(float level)
 {
+    TRACE_COMPONENT();
+    
     peakTextMeter.update(level);
     peakMeter.update(level);
     
@@ -510,6 +525,8 @@ void MacroMeter::resetHold()
 
 void DbScale::paint(juce::Graphics &g)
 {
+    TRACE_COMPONENT();
+
     g.drawImage(bkgd, getLocalBounds().toFloat());
 }
 
@@ -797,6 +814,8 @@ void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ident
 
 void Histogram::paint(juce::Graphics &g)
 {
+    TRACE_COMPONENT();
+    
     juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
     g.fillAll(juce::Colours::black);
 
@@ -827,21 +846,29 @@ void Histogram::buildTitleImage(juce::Graphics &g)
 void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
 {
     buffer.clear(NEGATIVE_INFINITY);
+    
+    TRACE_EVENT_BEGIN("component", "HistogramRepaint");
     repaint();
-}
+    TRACE_EVENT_END("component");}
 
 void Histogram::update(float value)
 {
+    TRACE_COMPONENT();
+    
     buffer.write(value);
+    
+    TRACE_EVENT_BEGIN("component", "HistogramRepaint");
     repaint();
-}
+    TRACE_EVENT_END("component");}
 
 void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
 {
+    TRACE_COMPONENT();
+    
     juce::Path fillPath = buildPath(path, buffer, bounds);
     
     if (!fillPath.isEmpty())
-    {
+    {       
         histogramColourGradient.point1.setXY(bounds.getX(), bounds.getBottom());
         histogramColourGradient.point2.setXY(bounds.getX(), bounds.getY());
         
@@ -849,14 +876,12 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
                                              NEGATIVE_INFINITY, MAX_DECIBELS,
                                              0.f, 1.f);
     
-        juce::Colour belowThresholdColour = juce::Colours::orange.withAlpha(0.5f);
-        juce::Colour aboveThresholdColour = juce::Colours::red.withAlpha(0.5f);
         histogramColourGradient.clearColours();
         histogramColourGradient.addColour(0, belowThresholdColour);
         histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
         histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.f), aboveThresholdColour);
         histogramColourGradient.addColour(1, aboveThresholdColour);
-        
+                
         g.setGradientFill(histogramColourGradient);
         g.fillPath(fillPath);
         
@@ -867,6 +892,8 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
 
 juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<float> &buffer, juce::Rectangle<float> bounds)
 {
+    TRACE_COMPONENT();
+    
     p.clear();
     
     size_t bufferSizeCached = buffer.getSize();
@@ -1052,6 +1079,8 @@ void Goniometer::buildBackground(juce::Graphics &g)
 
 void Goniometer::paint(juce::Graphics &g)
 {
+    TRACE_COMPONENT();
+    
     float leftSample,
           rightSample,
           mid,
@@ -1089,11 +1118,17 @@ void Goniometer::paint(juce::Graphics &g)
         
         leftSample  *= scale;
         rightSample *= scale;
+        
+        jassert( ! std::isnan(leftSample) && ! std::isinf(leftSample) );
+        jassert( ! std::isnan(rightSample) && ! std::isinf(rightSample) );
 
         // Multiplying by invsqrt(2) gives us half power or -3dB
         mid  = (leftSample + rightSample) * INV_SQRT_OF_2;
         side = (leftSample - rightSample) * INV_SQRT_OF_2;
                 
+        jassert( ! std::isnan(mid) && ! std::isinf(mid) );
+        jassert( ! std::isnan(side) && ! std::isinf(side) );
+        
         midMapped = juce::jmap(mid,
                                -1.f,
                                1.f,
@@ -1105,6 +1140,9 @@ void Goniometer::paint(juce::Graphics &g)
                                 -radius,
                                 radius);
         
+        jassert( ! std::isnan(midMapped) && ! std::isinf(midMapped) );
+        jassert( ! std::isnan(sideMapped) && ! std::isinf(sideMapped) );
+        
         vertex.setXY(sideMapped, midMapped);
         
         if (vertex.getDistanceSquaredFromOrigin() > radiusSquared)
@@ -1112,13 +1150,16 @@ void Goniometer::paint(juce::Graphics &g)
             vertex *= radius / vertex.getDistanceFromOrigin();
             vertex += centerFloat;
             
+            jassert( ! std::isnan(vertex.x) && ! std::isinf(vertex.x) );
+            jassert( ! std::isnan(vertex.y) && ! std::isinf(vertex.y) );
+
             clippedPoints.push(vertex);
         }
         else
         {
             vertex += centerFloat;
         }
-                    
+        
         if (i == 0)
         {
             p.startNewSubPath(vertex);
@@ -1222,6 +1263,8 @@ void CorrelationMeter::buildLabelsImage(juce::Graphics &g)
 
 void CorrelationMeter::update()
 {
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter::update");
+    
     int numSamples = buffer.getNumSamples();
     
     for (int iSample = 0; iSample < numSamples; ++iSample)
@@ -1248,7 +1291,11 @@ void CorrelationMeter::update()
         }
     }
     
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_BEGIN("component", "CorrelationMeterRepaint");
     repaint();
+    TRACE_EVENT_END("component");
 }
 
 void CorrelationMeter::drawAverage(juce::Graphics& g,
@@ -1331,7 +1378,10 @@ void StereoImageMeter::resized()
 
 void StereoImageMeter::update()
 {
+    TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
     goniometer.repaint();
+    TRACE_EVENT_END("component");
+    
     correlationMeter.update();
 }
 
@@ -1566,6 +1616,8 @@ void PFM10AudioProcessorEditor::onPeakHoldResetButtonClicked()
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
 {
+    TRACE_COMPONENT();
+    
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 }
@@ -1640,6 +1692,8 @@ void PFM10AudioProcessorEditor::resized()
 
 void PFM10AudioProcessorEditor::timerCallback()
 {
+    TRACE_COMPONENT();
+    
     if(audioProcessor.audioBufferFifo.getNumAvailableForReading() > 0)
     {
         // pull every element out of the audio buffer FIFO into the editor audio buffer

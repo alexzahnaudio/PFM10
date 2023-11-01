@@ -278,6 +278,8 @@ private:
     juce::Path path;
     float dbThreshold { 0 };
     juce::ColourGradient histogramColourGradient;
+    juce::Colour belowThresholdColour { juce::Colours::orange.withAlpha(0.5f) };
+    juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.5f) };
     
     const juce::String title;
     juce::Image titleImage;
