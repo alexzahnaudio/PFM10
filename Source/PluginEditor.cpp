@@ -1076,16 +1076,16 @@ void Goniometer::buildBackground(juce::Graphics &g)
 
 void Goniometer::paint(juce::Graphics &g)
 {
-    TRACE_EVENT_BEGIN("component", "Goniometer::paint");
-    
+    TRACE_EVENT_BEGIN("component", "goniometer draw bkgd");
     g.drawImageAt(backgroundImage, 0, 0);
+    TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "goniometer stroke path");
     g.setColour(juce::Colours::antiquewhite);
     g.strokePath(p, juce::PathStrokeType(2.0f));
     TRACE_EVENT_END("component");
     
-    TRACE_EVENT_BEGIN("component", "goniometer clipped points");
+    TRACE_EVENT_BEGIN("component", "goniometer clipped points", "numPoints", clippedPoints.size());
     g.setColour(juce::Colours::red);
         
     juce::Point<float> pt;
@@ -1093,17 +1093,15 @@ void Goniometer::paint(juce::Graphics &g)
     for (unsigned int i = 0; i < clippedPoints.size(); ++i)
     {
         pt = clippedPoints.top();
-        g.fillEllipse(pt.x, pt.y, 4.0f, 4.0f);
+        g.fillRect(pt.x, pt.y, 1.f, 1.f);
         clippedPoints.pop();
     }
-    TRACE_EVENT_END("component");
-    
     TRACE_EVENT_END("component");
 }
 
 void Goniometer::update()
 {
-    TRACE_COMPONENT();
+    TRACE_EVENT_BEGIN("component", "goniometer update");
     
     float leftSample,
           rightSample,
@@ -1190,6 +1188,7 @@ void Goniometer::update()
             p.lineTo(vertex);
         }
     }
+    TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
     juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
@@ -1220,8 +1219,7 @@ CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sa
 
 void CorrelationMeter::paint(juce::Graphics &g)
 {
-    TRACE_COMPONENT();
-    
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter drawAvg");
     // Skinny peak-average meter on top
     drawAverage(g,
                 peakMeterArea,
@@ -1232,6 +1230,7 @@ void CorrelationMeter::paint(juce::Graphics &g)
                 slowMeterArea,
                 slowAverager.getAvg(),
                 true);
+    TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "CorrelationMeter text");
     g.drawImageAt(labelsImage, labelsImageArea.getX(), labelsImageArea.getY());
