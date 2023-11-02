@@ -881,12 +881,9 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
         histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
         histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.f), aboveThresholdColour);
         histogramColourGradient.addColour(1, aboveThresholdColour);
-                
+        
         g.setGradientFill(histogramColourGradient);
         g.fillPath(fillPath);
-        
-        g.setColour(juce::Colours::orange);
-        g.strokePath(path, juce::PathStrokeType(1));
     }
 }
 
@@ -1079,6 +1076,33 @@ void Goniometer::buildBackground(juce::Graphics &g)
 
 void Goniometer::paint(juce::Graphics &g)
 {
+    TRACE_EVENT_BEGIN("component", "Goniometer::paint");
+    
+    g.drawImageAt(backgroundImage, 0, 0);
+    
+    TRACE_EVENT_BEGIN("component", "goniometer stroke path");
+    g.setColour(juce::Colours::antiquewhite);
+    g.strokePath(p, juce::PathStrokeType(2.0f));
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_BEGIN("component", "goniometer clipped points");
+    g.setColour(juce::Colours::red);
+        
+    juce::Point<float> pt;
+    
+    for (unsigned int i = 0; i < clippedPoints.size(); ++i)
+    {
+        pt = clippedPoints.top();
+        g.fillEllipse(pt.x, pt.y, 4.0f, 4.0f);
+        clippedPoints.pop();
+    }
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_END("component");
+}
+
+void Goniometer::update()
+{
     TRACE_COMPONENT();
     
     float leftSample,
@@ -1090,12 +1114,9 @@ void Goniometer::paint(juce::Graphics &g)
     float radiusSquared = radius * radius;
     juce::Point<float> centerFloat(center.toFloat());
     juce::Point<float> vertex;
-    std::stack<juce::Point<float>> clippedPoints;
     int numSamples = buffer.getNumSamples();
     
     p.clear();
-    
-    g.drawImageAt(backgroundImage, 0, 0);
     
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
     internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
@@ -1170,19 +1191,9 @@ void Goniometer::paint(juce::Graphics &g)
         }
     }
     
-    g.setColour(juce::Colours::antiquewhite);
-    g.strokePath(p, juce::PathStrokeType(2.0f));
-    
-    g.setColour(juce::Colours::red);
-        
-    juce::Point<float> pt;
-    
-    for (unsigned int i = 0; i < clippedPoints.size(); ++i)
-    {
-        pt = clippedPoints.top();
-        g.fillEllipse(pt.x, pt.y, 4.0f, 4.0f);
-        clippedPoints.pop();
-    }
+    TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================
@@ -1294,7 +1305,7 @@ void CorrelationMeter::update()
     TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "CorrelationMeterRepaint");
-    repaint();
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
     TRACE_EVENT_END("component");
 }
 
@@ -1378,11 +1389,13 @@ void StereoImageMeter::resized()
 
 void StereoImageMeter::update()
 {
-    TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
-    goniometer.repaint();
-    TRACE_EVENT_END("component");
+    TRACE_EVENT_BEGIN("component", "StereoImageMeter::update");
+    
+    goniometer.update();
     
     correlationMeter.update();
+    
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================
@@ -1411,6 +1424,9 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     initMenus();
     
     startTimerHz(refreshRateHz);
+    
+    updateThread.fn = std::function<void()>( [this] { update(); } );
+    updateThread.startThread();
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
@@ -1703,26 +1719,30 @@ void PFM10AudioProcessorEditor::timerCallback()
         
         // get the left channel's peak magnitude within the editor audio buffer
         float magLeftChannel = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
-        float dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
+        dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
         
         // get the right channel's peak magnitude within the editor audio buffer
         float magRightChannel = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
-        float dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
+        dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
         
-        // feed them to the stereo peak meter
-        peakStereoMeter.update(dbLeftChannel, dbRightChannel);
-        
-        // get the mono level (avg. of left and right channels), pass to histogram
+        // get the mono level (avg. of left and right channels)
         float magPeakMono = (magLeftChannel + magRightChannel) / 2;
-        float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
-        peakHistogram.update(dbPeakMono);
+        dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         
-        // update the goniometer and correlation meter
-        stereoImageMeter.update();
+        updateThread.notify();
     }
 }
 
 int PFM10AudioProcessorEditor::getRefreshRateHz() const
 {
     return refreshRateHz;
+}
+
+void PFM10AudioProcessorEditor::update()
+{
+    peakStereoMeter.update( dbLeftChannel.load(), dbRightChannel.load() );
+    
+    peakHistogram.update( dbPeakMono.load() );
+    
+    stereoImageMeter.update();
 }

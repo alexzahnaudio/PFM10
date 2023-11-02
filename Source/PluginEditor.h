@@ -302,11 +302,13 @@ struct Goniometer : juce::Component
     void paint(juce::Graphics& g) override;
     void resized() override;
     void setScale(float newScale) { scale = newScale; }
+    void update();
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
     juce::Path p;
+    std::stack<juce::Point<float>> clippedPoints;
     std::vector<float> opacities;
     int w, h;
     float radius, diameter;
@@ -361,6 +363,24 @@ private:
     CorrelationMeter correlationMeter;
 };
 
+class UpdateThread : public juce::Thread
+{
+public:
+    UpdateThread() : juce::Thread("PFM10 Update Thread") {}
+    ~UpdateThread() override { stopThread(2000); }
+    void run() override
+    {
+        for (;;)
+        {
+            if (threadShouldExit()) break;
+            fn();
+            wait(-1); //wait until notified 
+        }
+    }
+    
+    std::function<void()> fn;
+};
+
 //==============================================================================
 //MARK: - PFM10AudioProcessorEditor
 
@@ -376,6 +396,8 @@ public:
     //==============================================================================
     void timerCallback() override;
     int getRefreshRateHz() const;
+    //==============================================================================
+    void update();
     
 private:
     // This reference is provided as a quick way for your editor to
@@ -389,6 +411,12 @@ private:
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
+    
+    UpdateThread updateThread;
+    
+    std::atomic<float> dbLeftChannel,
+                       dbRightChannel,
+                       dbPeakMono;
     
     //==============================================================================
     // Menus
