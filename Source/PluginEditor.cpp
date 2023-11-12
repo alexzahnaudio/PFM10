@@ -343,7 +343,7 @@ void TextMeter::update(float valueDb)
         }
         
         TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
-        repaint();
+        juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
         TRACE_EVENT_END("component");
     }
 }
@@ -436,7 +436,7 @@ void Meter::update(float dbLevel)
     }
     
     TRACE_EVENT_BEGIN("component", "MeterRepaint");
-    repaint();
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
     TRACE_EVENT_END("component");
 }
 
@@ -858,7 +858,7 @@ void Histogram::update(float value)
     buffer.write(value);
     
     TRACE_EVENT_BEGIN("component", "HistogramRepaint");
-    repaint();
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
     TRACE_EVENT_END("component");}
 
 void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
@@ -1711,23 +1711,24 @@ void PFM10AudioProcessorEditor::timerCallback()
     
     if(audioProcessor.audioBufferFifo.getNumAvailableForReading() > 0)
     {
-        // pull every element out of the audio buffer FIFO into the editor audio buffer
+        // Pull every element out of the audio buffer FIFO into the editor audio buffer
         while( audioProcessor.audioBufferFifo.pull(editorAudioBuffer) )
         {
         }
         
-        // get the left channel's peak magnitude within the editor audio buffer
+        // Get the left channel's peak magnitude within the editor audio buffer
         float magLeftChannel = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
         dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
         
-        // get the right channel's peak magnitude within the editor audio buffer
+        // Get the right channel's peak magnitude within the editor audio buffer
         float magRightChannel = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
         dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
         
-        // get the mono level (avg. of left and right channels)
+        // Get the mono level (avg. of left and right channels)
         float magPeakMono = (magLeftChannel + magRightChannel) / 2;
         dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         
+        // Update the components with the newly retrieved audio data on a separate thread
         updateThread.notify();
     }
 }

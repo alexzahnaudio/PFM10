@@ -363,6 +363,7 @@ private:
     CorrelationMeter correlationMeter;
 };
 
+//MARK: - UpdateThread
 class UpdateThread : public juce::Thread
 {
 public:
@@ -370,6 +371,8 @@ public:
     ~UpdateThread() override { stopThread(2000); }
     void run() override
     {
+        wait(20); //wait a few ms before running updates
+        
         for (;;)
         {
             if (threadShouldExit()) break;
