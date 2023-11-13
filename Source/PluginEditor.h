@@ -308,7 +308,6 @@ private:
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
     juce::Path p;
-    std::stack<juce::Point<float>> clippedPoints;
     std::vector<float> opacities;
     int w, h;
     float radius, diameter;

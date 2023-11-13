@@ -1084,19 +1084,6 @@ void Goniometer::paint(juce::Graphics &g)
     g.setColour(juce::Colours::antiquewhite);
     g.strokePath(p, juce::PathStrokeType(2.0f));
     TRACE_EVENT_END("component");
-    
-    TRACE_EVENT_BEGIN("component", "goniometer clipped points", "numPoints", clippedPoints.size());
-    g.setColour(juce::Colours::red);
-        
-    juce::Point<float> pt;
-    
-    for (unsigned int i = 0; i < clippedPoints.size(); ++i)
-    {
-        pt = clippedPoints.top();
-        g.fillRect(pt.x, pt.y, 1.f, 1.f);
-        clippedPoints.pop();
-    }
-    TRACE_EVENT_END("component");
 }
 
 void Goniometer::update()
@@ -1164,6 +1151,7 @@ void Goniometer::update()
         
         vertex.setXY(sideMapped, midMapped);
         
+        // Constrain points to within the circular border
         if (vertex.getDistanceSquaredFromOrigin() > radiusSquared)
         {
             vertex *= radius / vertex.getDistanceFromOrigin();
@@ -1171,8 +1159,6 @@ void Goniometer::update()
             
             jassert( ! std::isnan(vertex.x) && ! std::isinf(vertex.x) );
             jassert( ! std::isnan(vertex.y) && ! std::isinf(vertex.y) );
-
-            clippedPoints.push(vertex);
         }
         else
         {
