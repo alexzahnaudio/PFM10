@@ -284,7 +284,7 @@ bool ValueHolder::updateHeldValue(float v)
 {
     currentValue = v;
     
-    if (v > heldValue)
+    if (v >= heldValue)
     {
         timeOfPeak = juce::Time::currentTimeMillis();
         heldValue = v;
