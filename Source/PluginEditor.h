@@ -307,6 +307,7 @@ private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
+    juce::Rectangle<int> areaToRepaint;
     juce::Path p;
     std::vector<float> opacities;
     int w, h;

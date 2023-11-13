@@ -967,6 +967,15 @@ void Goniometer::resized()
     backgroundImage = juce::Image(juce::Image::ARGB, w, h, true);
     juce::Graphics g(backgroundImage);
     buildBackground(g);
+    
+    int amountToTrimLeftRight = static_cast<int>( ( w - diameter ) / 2 );
+    int amountToTrimTopBottom = static_cast<int>( ( h - diameter ) / 2 );
+    
+    areaToRepaint = juce::Rectangle<int>(getLocalBounds()
+                                         .withTrimmedLeft(   amountToTrimLeftRight )
+                                         .withTrimmedRight(  amountToTrimLeftRight )
+                                         .withTrimmedTop(    amountToTrimTopBottom )
+                                         .withTrimmedBottom( amountToTrimTopBottom ));
 }
 
 void Goniometer::buildBackground(juce::Graphics &g)
@@ -1177,7 +1186,7 @@ void Goniometer::update()
     TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
-    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(areaToRepaint); } );
     TRACE_EVENT_END("component");
 }
 
@@ -1228,9 +1237,9 @@ void CorrelationMeter::resized()
     juce::Rectangle<int> localBounds = getLocalBounds();
     
     meterArea = localBounds
-    .withTrimmedBottom(20)
-    .withTrimmedLeft(10)
-    .withTrimmedRight(10);
+                .withTrimmedBottom(20)
+                .withTrimmedLeft(10)
+                .withTrimmedRight(10);
     
     int meterAreaHeight = meterArea.getHeight();
     
@@ -1238,7 +1247,7 @@ void CorrelationMeter::resized()
     
     slowMeterArea = meterArea.withTrimmedTop( static_cast<int>(meterAreaHeight * (1 - slowMeterHeightPercentage)) );
     
-    labelsImageArea = getLocalBounds().withTrimmedTop( meterAreaHeight );
+    labelsImageArea = localBounds.withTrimmedTop( meterAreaHeight );
     
     labelsImage = juce::Image(juce::Image::ARGB, labelsImageArea.getWidth(), labelsImageArea.getHeight(), true);
     juce::Graphics g(labelsImage);
@@ -1290,7 +1299,7 @@ void CorrelationMeter::update()
     TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "CorrelationMeterRepaint");
-    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(meterArea); } );
     TRACE_EVENT_END("component");
 }
 
@@ -1361,15 +1370,16 @@ void StereoImageMeter::resized()
 {
     float gonioToCorrMeterHeightRatio = 0.9f;
     
-    goniometer.setBoundsRelative(0.f,
-                                 0.f,
-                                 1.f,
+    // Magic numbers to not overlap the menus (except the goniomer slider a bit)
+    goniometer.setBoundsRelative(0.181f,
+                                 0.0f,
+                                 0.698f,
                                  gonioToCorrMeterHeightRatio);
-    
-    correlationMeter.setBoundsRelative(0.f,
+            
+    correlationMeter.setBoundsRelative(0.0f,
                                        gonioToCorrMeterHeightRatio,
-                                       1.f,
-                                       1.f - gonioToCorrMeterHeightRatio);
+                                       1.0f,
+                                       1.0f - gonioToCorrMeterHeightRatio);
 }
 
 void StereoImageMeter::update()
@@ -1647,7 +1657,7 @@ void PFM10AudioProcessorEditor::resized()
     int menuHeight = 30;
     int menuX = peakStereoMeter.getRight();
     int verticalSpaceBetweenMenus = 20;
-    int goniometerScaleRotarySliderSize = 125;
+    int goniometerScaleRotarySliderSize = 100;
     
     decayRateMenuLabel.setBounds(menuX,
                                  0,
