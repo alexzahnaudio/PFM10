@@ -207,6 +207,7 @@ struct DbScale : juce::Component
     void paint (juce::Graphics& g) override;
     void buildBackgroundImage(int dbDivision, juce::Rectangle<int> meterBounds, int minDb, int maxDb);
     static std::vector<Tick> getTicks(int dbDivision, juce::Rectangle<int> meterBounds, int minDb, int maxDb);
+    float yToDb(float y, float meterHeight, float minDb, float maxDb);
 private:
     juce::Image bkgd;
 };
@@ -268,6 +269,9 @@ struct Histogram : juce::Component, juce::ValueTree::Listener
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseEnter(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
     void update(float value);
 private:
     // Value Tree
@@ -286,6 +290,15 @@ private:
     juce::Point<int> titleImagePosition;
     const int titleWidth { 64 };
     const int titleHeight { 16 };
+    
+    DbScale dbScale;
+    
+    juce::Point<int> mousePos;
+    bool isMouseHovered { false };
+    juce::String dbValueHovered;
+    int dbValueTextAreaWidth { 40 };
+    int dbValueTextAreaHeight { 18 };
+    juce::Rectangle<int> dbValueTextArea { 0, 0, dbValueTextAreaWidth, dbValueTextAreaHeight };
     
     void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
     static juce::Path buildPath(juce::Path& p,

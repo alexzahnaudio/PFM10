@@ -554,6 +554,13 @@ std::vector<Tick> DbScale::getTicks(int dbDivision, juce::Rectangle<int> meterBo
     return ticks;
 }
 
+float DbScale::yToDb(float y, float meterHeight, float minDb, float maxDb)
+{
+    jassert(y >= 0);
+    
+    return juce::jmap(y, 0.0f, meterHeight, maxDb, minDb);
+}
+
 void DbScale::buildBackgroundImage(int dbDivision,
                                    juce::Rectangle<int> meterBounds,
                                    int minDb,
@@ -800,6 +807,9 @@ Histogram::Histogram(juce::ValueTree _vt, const juce::String& _title)
     : vt(_vt),
       title(_title)
 {
+    addAndMakeVisible(dbScale);
+    dbScale.setInterceptsMouseClicks(false, false);
+    
     vt.addListener(this);
     dbThreshold = _vt.getProperty(IDs::thresholdValue);
 }
@@ -818,6 +828,17 @@ void Histogram::paint(juce::Graphics &g)
     
     juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
     g.fillAll(juce::Colours::black);
+    
+    if (isMouseHovered)
+    {
+        g.setColour(juce::Colours::grey);
+        g.fillRect(0, mousePos.getY(), static_cast<int>(localBounds.getWidth()), 1);
+
+        dbValueTextArea.setX(mousePos.getX() < dbScale.getWidth() + dbValueTextAreaWidth ? dbScale.getWidth() - 4 : mousePos.getX() - dbValueTextAreaWidth - 4);
+        dbValueTextArea.setY(mousePos.getY() < dbValueTextAreaHeight ? mousePos.getY() : mousePos.getY() - dbValueTextAreaHeight);
+        
+        g.drawText(dbValueHovered, dbValueTextArea, juce::Justification::centredRight);
+    }
 
     displayPath(g, localBounds);
     
@@ -828,6 +849,20 @@ void Histogram::resized()
 {
     // use component width for buffer size
     buffer.resize(static_cast<size_t>(getWidth()), NEGATIVE_INFINITY);
+    
+    int dbScaleWidth = 30;
+    int dbDivision = 6;
+    auto bounds = getLocalBounds();
+    juce::Rectangle<int> dbScaleArea = juce::Rectangle<int>(bounds.getX(),
+                                                            bounds.getY(),
+                                                            dbScaleWidth,
+                                                            bounds.getHeight());
+    
+    dbScale.setBounds(dbScaleArea);
+    dbScale.buildBackgroundImage(dbDivision,
+                                 dbScaleArea,
+                                 NEGATIVE_INFINITY,
+                                 MAX_DECIBELS);
     
     titleImage = juce::Image(juce::Image::ARGB, titleWidth, titleHeight, true);
     juce::Graphics g(titleImage);
@@ -849,7 +884,33 @@ void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
     
     TRACE_EVENT_BEGIN("component", "HistogramRepaint");
     repaint();
-    TRACE_EVENT_END("component");}
+    TRACE_EVENT_END("component");
+}
+
+void Histogram::mouseMove(const juce::MouseEvent &e)
+{
+    mousePos = e.getPosition();
+    
+    float db = dbScale.yToDb(mousePos.getY(),
+                             getLocalBounds().getHeight(),
+                             NEGATIVE_INFINITY,
+                             MAX_DECIBELS);
+    
+    // Trim to one decimal place, round appropriately
+    dbValueHovered = juce::String( (static_cast<int>((db * 10) + 0.5f) * 0.1f), 1 );
+    
+    repaint();
+}
+
+void Histogram::mouseEnter(__attribute__((unused)) const juce::MouseEvent &e)
+{
+    isMouseHovered = true;
+}
+
+void Histogram::mouseExit(__attribute__((unused)) const juce::MouseEvent &e)
+{
+    isMouseHovered = false;
+}
 
 void Histogram::update(float value)
 {
