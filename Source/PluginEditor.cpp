@@ -16,11 +16,13 @@
 
 void LAF_ThresholdSlider::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
                                            float sliderPos,
-                                           float minSliderPos,
-                                           float maxSliderPos,
-                                           const juce::Slider::SliderStyle style,
+                                           __attribute__((unused)) float minSliderPos,
+                                           __attribute__((unused)) float maxSliderPos,
+                                           __attribute__((unused)) const juce::Slider::SliderStyle style,
                                            juce::Slider& slider)
 {
+    TRACE_COMPONENT();
+    
     // This Look-And-Feel class is designed specifically for linear-bar style sliders!
     //
     // If you intend to expand this to handle other slider styles, then change this jassert
@@ -69,7 +71,6 @@ void Averager<T>::clear(T initialValue)
     writeIndex = 0;
     avg = initialValue;
     sum = static_cast<T>(initialValue * numElements);
-    
 }
 
 template<typename T>
@@ -119,21 +120,27 @@ void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const j
 {
     if (_ID == IDs::decayRate)
     {
-        float decayRate = _vt.getProperty(IDs::decayRate);
+        int decayRate = _vt.getProperty(IDs::decayRate);
         
         setDecayRate(decayRate);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldDuration)
     {
         int newHoldDuration = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldTime(newHoldDuration);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldInf)
     {
         bool isInfiniteHoldEnabled = _vt.getProperty(IDs::peakHoldInf);
         
         setHoldForInf(isInfiniteHoldEnabled);
+        
+        return;
     }
 }
 
@@ -161,10 +168,10 @@ void DecayingValueHolder::setHoldTime(int ms)
     holdTimeMs = ms;
 }
 
-void DecayingValueHolder::setDecayRate(float dbPerSec)
+void DecayingValueHolder::setDecayRate(int dbPerSec)
 {
     // note: getTimerInterval() returns milliseconds
-    decayRatePerFrame = dbPerSec * getTimerInterval() / 1000;
+    decayRatePerFrame = static_cast<float>(dbPerSec) * getTimerInterval() / 1000;
 }
 
 void DecayingValueHolder::setHoldForInf(bool b)
@@ -178,7 +185,7 @@ void DecayingValueHolder::timerCallback()
 {
     juce::int64 now = getNow();
     
-    if (!holdForInf)
+    if (! holdForInf)
     {
         if ((now - peakTime) > holdTimeMs)
         {
@@ -224,18 +231,24 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         int newHoldDurationMs = _vt.getProperty(IDs::peakHoldDuration);
         
         setHoldDuration(newHoldDurationMs);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldEnabled)
     {
         bool b = _vt.getProperty(IDs::peakHoldEnabled);
         
         setHoldEnabled(b);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldInf)
     {
         bool b = _vt.getProperty(IDs::peakHoldInf);
         
         setHoldForInf(b);
+        
+        return;
     }
 }
 
@@ -244,7 +257,7 @@ void ValueHolder::timerCallback()
     juce::int64 now = juce::Time::currentTimeMillis();
     juce::int64 elapsed = now - timeOfPeak;
     
-    if (!holdForInf && elapsed > durationToHoldForMs)
+    if (! holdForInf && elapsed > durationToHoldForMs)
     {
         heldValue = currentValue;
         isOverThreshold = (heldValue > threshold);
@@ -264,16 +277,23 @@ void ValueHolder::setHoldEnabled(bool b)
     if (! b) setHoldDuration(0);
 }
 
-void ValueHolder::updateHeldValue(float v)
+/* Returns true if heldValue is updated (the new value is greater than heldValue).
+   Otherwise return false (heldValue stays the same).
+ */
+bool ValueHolder::updateHeldValue(float v)
 {
     currentValue = v;
     
-    if (v > heldValue)
+    if (v >= heldValue)
     {
         timeOfPeak = juce::Time::currentTimeMillis();
         heldValue = v;
         isOverThreshold = (heldValue > threshold);
+        
+        return true;
     }
+    
+    return false;
 }
 
 void ValueHolder::resetHeldValue()
@@ -289,25 +309,17 @@ TextMeter::TextMeter(juce::ValueTree _vt)
 {
     valueHolder.setThreshold(0.f);
     valueHolder.updateHeldValue(NEGATIVE_INFINITY);
+    
+    setOpaque(true);
+    setBufferedToImage(true);
 }
 
 void TextMeter::paint(juce::Graphics &g)
 {
-    juce::Colour textColor = valueHolder.getIsOverThreshold() ? juce::Colours::red : juce::Colours::white;
-    float valueToDisplay = valueHolder.getHeldValue();
-    
-    juce::String textToDisplay;
-    if (valueToDisplay > NEGATIVE_INFINITY)
-    {
-        textToDisplay = juce::String(valueToDisplay, 1).trimEnd();
-    }
-    else
-    {
-        textToDisplay = juce::String("-inf");
-    }
+    TRACE_COMPONENT();
     
     g.fillAll(juce::Colours::black);
-    g.setColour(textColor);
+    g.setColour ( valueHolder.getIsOverThreshold() ? textColorOverThreshold : textColorDefault );
     g.setFont(12.f);
     g.drawFittedText(textToDisplay,
                      getLocalBounds(),
@@ -317,20 +329,44 @@ void TextMeter::paint(juce::Graphics &g)
 
 void TextMeter::update(float valueDb)
 {
-    cachedValueDb = valueDb;
-    valueHolder.updateHeldValue(valueDb);
-    repaint();
+    TRACE_COMPONENT();
+
+    if ( valueHolder.updateHeldValue(valueDb) )
+    {
+        if (valueDb > NEGATIVE_INFINITY)
+        {
+            textToDisplay = juce::String(valueDb, 1).trimEnd();
+        }
+        else
+        {
+            textToDisplay = juce::String("-inf");
+        }
+        
+        TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+        juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+        TRACE_EVENT_END("component");
+    }
 }
 
 void TextMeter::setThreshold(float dbLevel)
 {
     dbThreshold = dbLevel;
     valueHolder.setThreshold(dbLevel);
+    
+    TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+    repaint();
+    TRACE_EVENT_END("component");
 }
 
 void TextMeter::resetHold()
 {
     valueHolder.resetHeldValue();
+    
+    textToDisplay = juce::String("-inf");
+    
+    TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
+    repaint();
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================
@@ -340,10 +376,14 @@ Meter::Meter(juce::ValueTree _vt)
 : decayingValueHolder(_vt)
 {
     setPeakHoldEnabled(_vt.getProperty(IDs::peakHoldEnabled));
+    
+    setOpaque(true);
 }
 
 void Meter::paint(juce::Graphics& g)
 {
+    TRACE_EVENT_BEGIN("component", "Meter::paint");
+
     g.fillAll(juce::Colours::black);
     
     juce::Rectangle<float> meterBounds = getLocalBounds().toFloat();
@@ -381,16 +421,23 @@ void Meter::paint(juce::Graphics& g)
     
     g.setColour(juce::Colours::white);
     g.fillRect(peakLevelTickMark);
+    
+    TRACE_EVENT_END("component");
 }
 
 void Meter::update(float dbLevel)
 {
+    TRACE_COMPONENT();
+
     dbPeak = dbLevel;
     if (peakHoldEnabled)
     {
         decayingValueHolder.updateHeldValue(dbPeak);
     }
-    repaint();
+    
+    TRACE_EVENT_BEGIN("component", "MeterRepaint");
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    TRACE_EVENT_END("component");
 }
 
 void Meter::resetHold()
@@ -439,6 +486,8 @@ void MacroMeter::resized()
 
 void MacroMeter::updateLevel(float level)
 {
+    TRACE_COMPONENT();
+    
     peakTextMeter.update(level);
     peakMeter.update(level);
     
@@ -476,21 +525,19 @@ void MacroMeter::resetHold()
 
 void DbScale::paint(juce::Graphics &g)
 {
+    TRACE_COMPONENT();
+
     g.drawImage(bkgd, getLocalBounds().toFloat());
 }
 
-std::vector<Tick> DbScale::getTicks(int dbDivision,
-                       juce::Rectangle<int> meterBounds,
-                       int minDb, int maxDb)
+std::vector<Tick> DbScale::getTicks(int dbDivision, juce::Rectangle<int> meterBounds, int minDb, int maxDb)
 {
     if(minDb > maxDb)
     {
         DBG("Warning! DbScale minDb is greater than maxDb (in function getTicks)! Swapping them.");
         std::swap(minDb, maxDb);
     }
-    
-    //u_int numTicks = static_cast<u_int>( ((maxDb - minDb) / dbDivision) + 1);
-    
+        
     auto ticks = std::vector<Tick>();
     
     for(int db = minDb; db <= maxDb; db += dbDivision)
@@ -538,9 +585,6 @@ void DbScale::buildBackgroundImage(int dbDivision,
     auto bkgdGraphicsContext = juce::Graphics(bkgd);
     bkgdGraphicsContext.addTransform(globalScaleFactorTransform);
     
-    // For debugging purposes:
-    //bkgdGraphicsContext.fillAll(juce::Colours::black);
-    
     std::vector<Tick> ticks = getTicks(dbDivision,
                                        meterBounds,
                                        minDb,
@@ -551,7 +595,7 @@ void DbScale::buildBackgroundImage(int dbDivision,
     {
         int tickInt = static_cast<int>(tick.db);
         std::string tickString = std::to_string(tickInt);
-        if(tickInt > 0) tickString.insert(0,"+");
+        if(tickInt > 0) tickString.insert(0, "+");
         
         // NOTE: the text shifts downward by (height) pixels, but the text
         //       disappears if height is set to 0. This is causing the ticks to
@@ -564,8 +608,6 @@ void DbScale::buildBackgroundImage(int dbDivision,
                                            1,                       //height
                                            juce::Justification::centred,
                                            1);                      //max num lines
-        
-        //DBG(tickString << " at y position " << std::to_string(tick.y));
     }
 }
 
@@ -584,6 +626,7 @@ StereoMeter::StereoMeter(juce::ValueTree _vt, juce::String _meterName)
     addAndMakeVisible(dbScale);
     
     label.setText("L  " + _meterName + "  R", juce::dontSendNotification);
+    label.setBufferedToImage(true);
     addAndMakeVisible(label);
     
     // update value tree when threshold slider value is changed, and vice versa
@@ -613,6 +656,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.updateThreshold(dbLevel);
         rightMacroMeter.updateThreshold(dbLevel);
+        
+        return;
     }
     else if (_ID == IDs::averagerIntervals)
     {
@@ -620,6 +665,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
         rightMacroMeter.setAveragerIntervals(newNumAveragerIntervals);
+        
+        return;
     }
     else if (_ID == IDs::peakHoldEnabled)
     {
@@ -627,6 +674,8 @@ void StereoMeter::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
         
         leftMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
         rightMacroMeter.setPeakHoldEnabled(peakHoldEnabled);
+        
+        return;
     }
 }
 
@@ -641,7 +690,8 @@ void StereoMeter::resized()
     auto bounds = getLocalBounds();
     auto height = bounds.getHeight();
     int macroMeterWidth = 40;
-    int macroMeterHeight = height-30;
+    int macroMeterHeight = height - 30;
+    int dbDivision = 6;
     
     leftMacroMeter.setTopLeftPosition(0, 0);
     leftMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
@@ -649,20 +699,20 @@ void StereoMeter::resized()
     dbScale.setBounds(leftMacroMeter.getRight(),
                       leftMacroMeter.getY(),
                       30,
-                      leftMacroMeter.getHeight()+50);
-    dbScale.buildBackgroundImage(6, //db division
+                      leftMacroMeter.getHeight() + 50);
+    dbScale.buildBackgroundImage(dbDivision,
                                  leftMacroMeter.getBounds().withTrimmedTop(leftMacroMeter.getTextHeight()),
                                  NEGATIVE_INFINITY,
                                  MAX_DECIBELS);
     
-    rightMacroMeter.setTopLeftPosition(leftMacroMeter.getRight()+dbScale.getWidth(), 0);
+    rightMacroMeter.setTopLeftPosition(leftMacroMeter.getRight() + dbScale.getWidth(), 0);
     rightMacroMeter.setSize(macroMeterWidth, macroMeterHeight);
     
     label.setBounds(leftMacroMeter.getX(),
-                    leftMacroMeter.getBottom()+10,
-                    rightMacroMeter.getRight()-leftMacroMeter.getX(),
+                    leftMacroMeter.getBottom() + 10,
+                    rightMacroMeter.getRight() - leftMacroMeter.getX(),
                     50);
-    label.setJustificationType(juce::Justification(12)); // top-centered
+    label.setJustificationType(juce::Justification::centredTop);
     
     thresholdSlider.setBounds(dbScale.getX(),
                               leftMacroMeter.getTextHeight(),
@@ -709,7 +759,7 @@ void ReadAllAfterWriteCircularBuffer<T>::write(T t)
     
     data[writeIndexCached] = t;
     
-    writeIndexCached = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+    writeIndexCached = (writeIndexCached == sizeCached - 1) ? 0 : writeIndexCached + 1;
     
     writeIndex = writeIndexCached;
 }
@@ -726,7 +776,7 @@ size_t ReadAllAfterWriteCircularBuffer<T>::getReadIndex() const
     size_t writeIndexCached = writeIndex;
     size_t sizeCached = getSize();
     
-    size_t readIndex = (writeIndexCached == sizeCached-1) ? 0 : writeIndexCached+1;
+    size_t readIndex = (writeIndexCached == sizeCached - 1) ? 0 : writeIndexCached + 1;
         
     return readIndex;
 }
@@ -764,39 +814,61 @@ void Histogram::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ident
 
 void Histogram::paint(juce::Graphics &g)
 {
+    TRACE_COMPONENT();
+    
     juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
     g.fillAll(juce::Colours::black);
 
     displayPath(g, localBounds);
     
-    g.setColour(juce::Colours::white);
-    g.drawText(title, localBounds, juce::Justification(20)); //bottom-centered
+    g.drawImageAt(titleImage, titleImagePosition.x, titleImagePosition.y);
 }
 
 void Histogram::resized()
 {
     // use component width for buffer size
     buffer.resize(static_cast<size_t>(getWidth()), NEGATIVE_INFINITY);
+    
+    titleImage = juce::Image(juce::Image::ARGB, titleWidth, titleHeight, true);
+    juce::Graphics g(titleImage);
+    buildTitleImage(g);
+    
+    titleImagePosition.setXY( getLocalBounds().getCentreX() - titleWidth/2, getLocalBounds().getBottom() - titleHeight );
+}
+
+void Histogram::buildTitleImage(juce::Graphics &g)
+{
+    g.setColour(juce::Colours::white);
+    g.setFont(16.0f);
+    g.drawText(title, 0, 0, titleWidth, titleHeight, juce::Justification::centredBottom);
 }
 
 void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
 {
     buffer.clear(NEGATIVE_INFINITY);
+    
+    TRACE_EVENT_BEGIN("component", "HistogramRepaint");
     repaint();
-}
+    TRACE_EVENT_END("component");}
 
 void Histogram::update(float value)
 {
+    TRACE_COMPONENT();
+    
     buffer.write(value);
-    repaint();
-}
+    
+    TRACE_EVENT_BEGIN("component", "HistogramRepaint");
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    TRACE_EVENT_END("component");}
 
 void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
 {
+    TRACE_COMPONENT();
+    
     juce::Path fillPath = buildPath(path, buffer, bounds);
     
     if (!fillPath.isEmpty())
-    {
+    {       
         histogramColourGradient.point1.setXY(bounds.getX(), bounds.getBottom());
         histogramColourGradient.point2.setXY(bounds.getX(), bounds.getY());
         
@@ -804,8 +876,6 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
                                              NEGATIVE_INFINITY, MAX_DECIBELS,
                                              0.f, 1.f);
     
-        juce::Colour belowThresholdColour = juce::Colours::orange.withAlpha(0.5f);
-        juce::Colour aboveThresholdColour = juce::Colours::red.withAlpha(0.5f);
         histogramColourGradient.clearColours();
         histogramColourGradient.addColour(0, belowThresholdColour);
         histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
@@ -814,14 +884,13 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
         
         g.setGradientFill(histogramColourGradient);
         g.fillPath(fillPath);
-        
-        g.setColour(juce::Colours::orange);
-        g.strokePath(path, juce::PathStrokeType(1));
     }
 }
 
 juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<float> &buffer, juce::Rectangle<float> bounds)
 {
+    TRACE_COMPONENT();
+    
     p.clear();
     
     size_t bufferSizeCached = buffer.getSize();
@@ -831,19 +900,19 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
     
     auto map = [=](float db)
     {
-        float result = juce::jmap(db,NEGATIVE_INFINITY,MAX_DECIBELS,bottom,0.f);
+        float result = juce::jmap(db, NEGATIVE_INFINITY, MAX_DECIBELS, bottom, 0.f);
         return result;
     };
     
     auto incrementAndWrap = [=](std::size_t readIndex)
     {
-        return (readIndex == bufferSizeCached-1) ? 0 : readIndex+1;
+        return (readIndex == bufferSizeCached - 1) ? 0 : readIndex + 1;
     };
             
     p.startNewSubPath(0, map(dataCached[readIndexCached]));
     readIndexCached = incrementAndWrap(readIndexCached);
         
-    for (size_t x = 1; x < bufferSizeCached-1; ++x)
+    for (size_t x = 1; x < bufferSizeCached - 1; ++x)
     {
         p.lineTo(x, map(dataCached[readIndexCached]));
         readIndexCached = incrementAndWrap(readIndexCached);
@@ -869,23 +938,45 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
 Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
     : buffer(_buffer)
 {
-    internalBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+    int numChannels = buffer.getNumChannels();
+    int numSamples = buffer.getNumSamples();
+    
+    internalBuffer.setSize(numChannels, numSamples);
     internalBuffer.clear();
+    
+    opacities.resize( static_cast<size_t>(numSamples), 0 );
+    
+    for (size_t i = 0; i < static_cast<size_t>(numSamples); ++i)
+    {
+        opacities[i] = juce::jmap(static_cast<float>(i),
+                                  0.0f,
+                                  static_cast<float>(numSamples - 1),
+                                  0.5f,
+                                  1.0f);
+    }
 }
 
 void Goniometer::resized()
 {
     w = getWidth();
     h = getHeight();
-    center = juce::Point<int>( w/2, h/2 );
+    center = juce::Point<int>( w / 2, h / 2 );
     diameter = ((w > h) ? h : w) - 35;      // 35 pixels shorter than the smaller dimension
-    radius = diameter/2;
+    radius = diameter / 2;
     
     backgroundImage = juce::Image(juce::Image::ARGB, w, h, true);
     juce::Graphics g(backgroundImage);
     buildBackground(g);
+    
+    int amountToTrimLeftRight = static_cast<int>( ( w - diameter ) / 2 );
+    int amountToTrimTopBottom = static_cast<int>( ( h - diameter ) / 2 );
+    
+    areaToRepaint = juce::Rectangle<int>(getLocalBounds()
+                                         .withTrimmedLeft(   amountToTrimLeftRight )
+                                         .withTrimmedRight(  amountToTrimLeftRight )
+                                         .withTrimmedTop(    amountToTrimTopBottom )
+                                         .withTrimmedBottom( amountToTrimTopBottom ));
 }
-
 
 void Goniometer::buildBackground(juce::Graphics &g)
 {
@@ -954,10 +1045,10 @@ void Goniometer::buildBackground(juce::Graphics &g)
     // S+
     g.drawText(axisLabels[0],
                center.getX() - radiusInt - axisLabelSize,
-               center.getY() - axisLabelSize/2,
+               center.getY() - axisLabelSize / 2,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(34)); // centered right
+               juce::Justification::centredRight);
     
     // L
     g.drawText(axisLabels[1],
@@ -965,15 +1056,15 @@ void Goniometer::buildBackground(juce::Graphics &g)
                center.getY() - radiusDotOrthoInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(18)); // bottom right
+               juce::Justification::bottomRight);
     
     // M
     g.drawText(axisLabels[2],
-               center.getX() - axisLabelSize/2,
+               center.getX() - axisLabelSize / 2,
                center.getY() - radiusInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(20)); // bottom center
+               juce::Justification::centredBottom);
     
     // R
     g.drawText(axisLabels[3],
@@ -981,46 +1072,78 @@ void Goniometer::buildBackground(juce::Graphics &g)
                center.getY() - radiusDotOrthoInt - axisLabelSize,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(17)); // bottom left
+               juce::Justification::bottomLeft);
     
     // S-
     g.drawText(axisLabels[4],
                center.getX() + radiusInt,
-               center.getY() - axisLabelSize/2,
+               center.getY() - axisLabelSize / 2,
                axisLabelSize,
                axisLabelSize,
-               juce::Justification(33)); // centered left
+               juce::Justification::centredLeft);
 }
 
 void Goniometer::paint(juce::Graphics &g)
 {
+    TRACE_EVENT_BEGIN("component", "goniometer draw bkgd");
+    g.drawImageAt(backgroundImage, 0, 0);
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_BEGIN("component", "goniometer stroke path");
+    g.setColour(juce::Colours::antiquewhite);
+    g.strokePath(p, juce::PathStrokeType(2.0f));
+    TRACE_EVENT_END("component");
+}
+
+void Goniometer::update()
+{
+    TRACE_EVENT_BEGIN("component", "goniometer update");
+    
     float leftSample,
           rightSample,
           mid,
           side,
           midMapped,
-          sideMapped,
-          previousMidMapped = 0.f,
-          previousSideMapped = 0.f,
-          opacity = 0.f;
-    float centerX = static_cast<float>(center.getX());
-    float centerY = static_cast<float>(center.getY());
+          sideMapped;
+    float radiusSquared = radius * radius;
+    juce::Point<float> centerFloat(center.toFloat());
+    juce::Point<float> vertex;
     int numSamples = buffer.getNumSamples();
-        
-    g.drawImageAt(backgroundImage, 0, 0);
+    
+    p.clear();
     
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
     internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
     
     for (int i = 0; i < numSamples; ++i)
     {
-        leftSample = internalBuffer.getSample(0, i) * scale;
-        rightSample = internalBuffer.getSample(1, i) * scale;
+        leftSample  = internalBuffer.getSample(0, i);
+        rightSample = internalBuffer.getSample(1, i);
+        
+        if (std::isnan(leftSample) || std::isinf(leftSample))
+        {
+            leftSample = 0.0f;
+            DBG("Invalid sample detected in buffer.");
+        }
+        if (std::isnan(rightSample) || std::isinf(rightSample))
+        {
+            rightSample = 0.0f;
+            DBG("Invalid sample detected in buffer.");
+        }
+        
+        leftSample  *= scale;
+        rightSample *= scale;
+        
+        jassert( ! std::isnan(leftSample) && ! std::isinf(leftSample) );
+        jassert( ! std::isnan(rightSample) && ! std::isinf(rightSample) );
 
-        //mult by invsqrt(2) gives us half power or -3dB
-        mid = (leftSample + rightSample) * INV_SQRT_OF_2;
+        // Multiplying by invsqrt(2) gives us half power or -3dB
+        mid  = (leftSample + rightSample) * INV_SQRT_OF_2;
         side = (leftSample - rightSample) * INV_SQRT_OF_2;
                 
+        jassert( ! std::isnan(mid) && ! std::isinf(mid) );
+        jassert( ! std::isnan(side) && ! std::isinf(side) );
+        
         midMapped = juce::jmap(mid,
                                -1.f,
                                1.f,
@@ -1032,48 +1155,39 @@ void Goniometer::paint(juce::Graphics &g)
                                 -radius,
                                 radius);
         
-        if (   std::isnan(leftSample) || std::isnan(rightSample)
-            || std::isinf(leftSample) || std::isinf(rightSample))
+        jassert( ! std::isnan(midMapped) && ! std::isinf(midMapped) );
+        jassert( ! std::isnan(sideMapped) && ! std::isinf(sideMapped) );
+        
+        vertex.setXY(sideMapped, midMapped);
+        
+        // Constrain points to within the circular border
+        if (vertex.getDistanceSquaredFromOrigin() > radiusSquared)
         {
-            midMapped = previousMidMapped;
-            sideMapped = previousSideMapped;
-        }
+            vertex *= radius / vertex.getDistanceFromOrigin();
+            vertex += centerFloat;
             
-        if (i == 0)
-        {
-            previousMidMapped = midMapped;
-            previousSideMapped = sideMapped;
+            jassert( ! std::isnan(vertex.x) && ! std::isinf(vertex.x) );
+            jassert( ! std::isnan(vertex.y) && ! std::isinf(vertex.y) );
         }
         else
         {
-            // Final sample in buffer gets a pretty dot for a sort of glowing-datapoint effect
-            if (i == numSamples-1)
-            {
-                g.setColour(juce::Colours::antiquewhite);
-                g.fillEllipse(centerX + sideMapped - 2,
-                              centerY + midMapped - 2,
-                              4,
-                              4);
-            }
-            
-            p.clear();
-            p.startNewSubPath(centerX + previousSideMapped, centerY + previousMidMapped);
-            p.lineTo(centerX + sideMapped, centerY + midMapped);
-                        
-            // Transparency scales from 0.5 to 1.0 as the buffer is traversed
-            opacity = juce::jmap(static_cast<float>(i),
-                                 1.f,
-                                 static_cast<float>(numSamples)-1,
-                                 0.5f,
-                                 1.0f);
-                                    
-            g.setColour(juce::Colour(0.1f, 0.3f, opacity, opacity));
-            g.strokePath(p, juce::PathStrokeType(2.f));
-            
-            previousMidMapped = midMapped;
-            previousSideMapped = sideMapped;
+            vertex += centerFloat;
+        }
+        
+        if (i == 0)
+        {
+            p.startNewSubPath(vertex);
+        }
+        else
+        {
+            p.lineTo(vertex);
         }
     }
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_BEGIN("component", "GoniometerRepaint");
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(areaToRepaint); } );
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================
@@ -1095,39 +1209,67 @@ CorrelationMeter::CorrelationMeter(juce::AudioBuffer<float>& _buffer, double _sa
     for (juce::dsp::FIR::Filter<float> &filter : filters)
     {
         filter = juce::dsp::FIR::Filter<float>(coefficientsPtr);
-
     }
 }
 
 void CorrelationMeter::paint(juce::Graphics &g)
 {
-    juce::Rectangle<int> meterArea = getLocalBounds()
-    .withTrimmedBottom(20)
-    .withTrimmedLeft(10)
-    .withTrimmedRight(10);
-    
-    float slowMeterHeightPercentage = 0.75f;
-    
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter drawAvg");
     // Skinny peak-average meter on top
     drawAverage(g,
-                meterArea.withTrimmedBottom(static_cast<int>( meterArea.getHeight() * slowMeterHeightPercentage )),
+                peakMeterArea,
                 peakAverager.getAvg(),
                 true);
     // Thicker slow-average meter on bottom
     drawAverage(g,
-                meterArea.withTrimmedTop(static_cast<int>( meterArea.getHeight() * (1 - slowMeterHeightPercentage) )),
+                slowMeterArea,
                 slowAverager.getAvg(),
                 true);
+    TRACE_EVENT_END("component");
     
-    // Text Labels
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter text");
+    g.drawImageAt(labelsImage, labelsImageArea.getX(), labelsImageArea.getY());
+    TRACE_EVENT_END("component");
+}
+
+void CorrelationMeter::resized()
+{
+    juce::Rectangle<int> localBounds = getLocalBounds();
+    
+    meterArea = localBounds
+                .withTrimmedBottom(20)
+                .withTrimmedLeft(10)
+                .withTrimmedRight(10);
+    
+    int meterAreaHeight = meterArea.getHeight();
+    
+    peakMeterArea = meterArea.withTrimmedBottom( static_cast<int>(meterAreaHeight * slowMeterHeightPercentage) );
+    
+    slowMeterArea = meterArea.withTrimmedTop( static_cast<int>(meterAreaHeight * (1 - slowMeterHeightPercentage)) );
+    
+    labelsImageArea = localBounds.withTrimmedTop( meterAreaHeight );
+    
+    labelsImage = juce::Image(juce::Image::ARGB, labelsImageArea.getWidth(), labelsImageArea.getHeight(), true);
+    juce::Graphics g(labelsImage);
+    buildLabelsImage(g);
+}
+
+void CorrelationMeter::buildLabelsImage(juce::Graphics &g)
+{
+    juce::Rectangle<int> rect( labelsImageArea.getWidth(), labelsImageArea.getHeight() );
+    
     g.setColour(juce::Colours::white);
-    g.drawText("-1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomLeft));
-    g.drawText("0",  getLocalBounds(), juce::Justification(juce::Justification::Flags::centredBottom));
-    g.drawText("+1", getLocalBounds(), juce::Justification(juce::Justification::Flags::bottomRight));
+    g.setFont(16.0f);
+    
+    g.drawText("-1", rect, juce::Justification::topLeft);
+    g.drawText("0",  rect, juce::Justification::centredTop);
+    g.drawText("+1", rect, juce::Justification::topRight);
 }
 
 void CorrelationMeter::update()
 {
+    TRACE_EVENT_BEGIN("component", "CorrelationMeter::update");
+    
     int numSamples = buffer.getNumSamples();
     
     for (int iSample = 0; iSample < numSamples; ++iSample)
@@ -1154,7 +1296,11 @@ void CorrelationMeter::update()
         }
     }
     
-    repaint();
+    TRACE_EVENT_END("component");
+    
+    TRACE_EVENT_BEGIN("component", "CorrelationMeterRepaint");
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(meterArea); } );
+    TRACE_EVENT_END("component");
 }
 
 void CorrelationMeter::drawAverage(juce::Graphics& g,
@@ -1171,7 +1317,7 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
     
     int averageMapped = static_cast<int>(juce::jmap(abs(average),
                                                     0.f,
-                                                    width/2.f));
+                                                    width / 2.f));
     
     g.setColour(juce::Colours::orange);
     if (average < 0)
@@ -1224,20 +1370,27 @@ void StereoImageMeter::resized()
 {
     float gonioToCorrMeterHeightRatio = 0.9f;
     
-    goniometer.setBoundsRelative(0.f,
-                                 0.f,
-                                 1.f,
+    // Magic numbers to not overlap the menus (except the goniomer slider a bit)
+    goniometer.setBoundsRelative(0.181f,
+                                 0.0f,
+                                 0.698f,
                                  gonioToCorrMeterHeightRatio);
-    correlationMeter.setBoundsRelative(0.f,
+            
+    correlationMeter.setBoundsRelative(0.0f,
                                        gonioToCorrMeterHeightRatio,
-                                       1.f,
-                                       1.f - gonioToCorrMeterHeightRatio);
+                                       1.0f,
+                                       1.0f - gonioToCorrMeterHeightRatio);
 }
 
 void StereoImageMeter::update()
 {
-    goniometer.repaint();
+    TRACE_EVENT_BEGIN("component", "StereoImageMeter::update");
+    
+    goniometer.update();
+    
     correlationMeter.update();
+    
+    TRACE_EVENT_END("component");
 }
 
 //==============================================================================
@@ -1266,6 +1419,9 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
     initMenus();
     
     startTimerHz(refreshRateHz);
+    
+    updateThread.fn = std::function<void()>( [this] { update(); } );
+    updateThread.startThread();
 }
 
 PFM10AudioProcessorEditor::~PFM10AudioProcessorEditor()
@@ -1277,6 +1433,7 @@ void PFM10AudioProcessorEditor::initMenus()
     // Decay Rate Menu
     
     decayRateMenuLabel.setJustificationType(juce::Justification::centred);
+    decayRateMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(decayRateMenuLabel);
     
     decayRateMenu.addItem("-3dB/s",  DB_PER_SEC_3);
@@ -1287,11 +1444,13 @@ void PFM10AudioProcessorEditor::initMenus()
     decayRateMenu.setTooltip("Peak Marker Decay Rate");
     decayRateMenu.onChange = [this] { onDecayRateMenuChanged(); };
     decayRateMenu.setSelectedId( decayRateMenuSelectByValue(valueTree.getProperty(IDs::decayRate)) );
+    decayRateMenu.setBufferedToImage(true);
     addAndMakeVisible(decayRateMenu);
     
     // Averager Duration Menu
     
     averagerDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    averagerDurationMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(averagerDurationMenuLabel);
 
     averagerDurationMenu.addItem("100ms",  AVERAGER_DURATION_MS_100);
@@ -1302,11 +1461,13 @@ void PFM10AudioProcessorEditor::initMenus()
     averagerDurationMenu.setTooltip("Averaging duration for RMS meters");
     averagerDurationMenu.onChange = [this] { onAveragerDurationMenuChanged(); };
     averagerDurationMenu.setSelectedId( averagerDurationMenuSelectByValue(valueTree.getProperty(IDs::averagerIntervals)) );
+    averagerDurationMenu.setBufferedToImage(true);
     addAndMakeVisible(averagerDurationMenu);
     
     // Peak Hold Duration Menu
     
     peakHoldDurationMenuLabel.setJustificationType(juce::Justification::centred);
+    peakHoldDurationMenuLabel.setBufferedToImage(true);
     addAndMakeVisible(peakHoldDurationMenuLabel);
 
     peakHoldDurationMenu.addItem("0s",   PEAK_HOLD_DURATION_MS_0);
@@ -1318,6 +1479,7 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldDurationMenu.setTooltip("Peak hold duration for meters");
     peakHoldDurationMenu.onChange = [this] { onPeakHoldDurationMenuChanged(); };
     peakHoldDurationMenu.setSelectedId( peakHoldDurationMenuSelectByValueTree(valueTree) );
+    peakHoldDurationMenu.setBufferedToImage(true);
     addAndMakeVisible(peakHoldDurationMenu);
     
     // Peak Hold Reset Button
@@ -1325,11 +1487,13 @@ void PFM10AudioProcessorEditor::initMenus()
     peakHoldResetButton.setButtonText("Reset Hold");
     peakHoldResetButton.onClick = [this] { onPeakHoldResetButtonClicked(); };
     peakHoldResetButton.setVisible( valueTree.getProperty(IDs::peakHoldInf) );
+    peakHoldResetButton.setBufferedToImage(true);
     addAndMakeVisible(peakHoldResetButton);
     
     // Goniometer Scale Rotary Slider
     
     goniometerScaleRotarySliderLabel.setJustificationType(juce::Justification::centred);
+    goniometerScaleRotarySliderLabel.setBufferedToImage(true);
     addAndMakeVisible(goniometerScaleRotarySliderLabel);
 
     goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
@@ -1342,6 +1506,7 @@ void PFM10AudioProcessorEditor::initMenus()
     goniometerScaleRotarySlider.setRange(0.5f, 2.0f);
     goniometerScaleRotarySlider.getValueObject().referTo(valueTree.getPropertyAsValue(IDs::goniometerScale, nullptr));
     goniometerScaleRotarySlider.setDoubleClickReturnValue(true, 1.0f);
+    goniometerScaleRotarySlider.setBufferedToImage(true);
     addAndMakeVisible(goniometerScaleRotarySlider);
 }
 
@@ -1462,6 +1627,8 @@ void PFM10AudioProcessorEditor::onPeakHoldResetButtonClicked()
 
 void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
 {
+    TRACE_COMPONENT();
+    
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 }
@@ -1490,7 +1657,7 @@ void PFM10AudioProcessorEditor::resized()
     int menuHeight = 30;
     int menuX = peakStereoMeter.getRight();
     int verticalSpaceBetweenMenus = 20;
-    int goniometerScaleRotarySliderSize = 125;
+    int goniometerScaleRotarySliderSize = 100;
     
     decayRateMenuLabel.setBounds(menuX,
                                  0,
@@ -1536,35 +1703,42 @@ void PFM10AudioProcessorEditor::resized()
 
 void PFM10AudioProcessorEditor::timerCallback()
 {
+    TRACE_COMPONENT();
+    
     if(audioProcessor.audioBufferFifo.getNumAvailableForReading() > 0)
     {
-        // pull every element out of the audio buffer FIFO into the editor audio buffer
+        // Pull every element out of the audio buffer FIFO into the editor audio buffer
         while( audioProcessor.audioBufferFifo.pull(editorAudioBuffer) )
         {
         }
         
-        // get the left channel's peak magnitude within the editor audio buffer
+        // Get the left channel's peak magnitude within the editor audio buffer
         float magLeftChannel = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
-        float dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
+        dbLeftChannel = juce::Decibels::gainToDecibels(magLeftChannel, NEGATIVE_INFINITY);
         
-        // get the right channel's peak magnitude within the editor audio buffer
+        // Get the right channel's peak magnitude within the editor audio buffer
         float magRightChannel = editorAudioBuffer.getMagnitude(1, 0, editorAudioBuffer.getNumSamples());
-        float dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
+        dbRightChannel = juce::Decibels::gainToDecibels(magRightChannel, NEGATIVE_INFINITY);
         
-        // feed them to the stereo peak meter
-        peakStereoMeter.update(dbLeftChannel, dbRightChannel);
-        
-        // get the mono level (avg. of left and right channels), pass to histogram
+        // Get the mono level (avg. of left and right channels)
         float magPeakMono = (magLeftChannel + magRightChannel) / 2;
-        float dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
-        peakHistogram.update(dbPeakMono);
+        dbPeakMono = juce::Decibels::gainToDecibels(magPeakMono, NEGATIVE_INFINITY);
         
-        // update the goniometer and correlation meter
-        stereoImageMeter.update();
+        // Update the components with the newly retrieved audio data on a separate thread
+        updateThread.notify();
     }
 }
 
 int PFM10AudioProcessorEditor::getRefreshRateHz() const
 {
     return refreshRateHz;
+}
+
+void PFM10AudioProcessorEditor::update()
+{
+    peakStereoMeter.update( dbLeftChannel.load(), dbRightChannel.load() );
+    
+    peakHistogram.update( dbPeakMono.load() );
+    
+    stereoImageMeter.update();
 }

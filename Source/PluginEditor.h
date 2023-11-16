@@ -86,7 +86,7 @@ struct DecayingValueHolder : juce::Timer, juce::ValueTree::Listener
     float getHeldValue() const { return heldValue; }
     bool isOverThreshold() const;
     void setHoldTime(int ms);
-    void setDecayRate(float dbPerSec);
+    void setDecayRate(int dbPerSec);
     void setHoldForInf(bool b);
     void timerCallback() override;
 private:
@@ -110,7 +110,7 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     ValueHolder(juce::ValueTree _vt);
     ~ValueHolder() override;
     void setThreshold(float th);
-    void updateHeldValue(float v);
+    bool updateHeldValue(float v);
     void resetHeldValue();
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
     void setHoldEnabled(bool b);
@@ -144,9 +144,11 @@ struct TextMeter : juce::Component
     void setThreshold(float dbLevel);
     void resetHold();
 private:
-    float cachedValueDb;
     ValueHolder valueHolder;
     float dbThreshold { 0 };
+    juce::Colour textColorDefault { juce::Colours::white };
+    juce::Colour textColorOverThreshold { juce::Colours::red };
+    juce::String textToDisplay { "-inf" };
 };
 
 //MARK: - Meter
@@ -276,12 +278,20 @@ private:
     juce::Path path;
     float dbThreshold { 0 };
     juce::ColourGradient histogramColourGradient;
+    juce::Colour belowThresholdColour { juce::Colours::orange.withAlpha(0.5f) };
+    juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.5f) };
+    
     const juce::String title;
+    juce::Image titleImage;
+    juce::Point<int> titleImagePosition;
+    const int titleWidth { 64 };
+    const int titleHeight { 16 };
     
     void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
     static juce::Path buildPath(juce::Path& p,
                           ReadAllAfterWriteCircularBuffer<float>& buffer,
                           juce::Rectangle<float> bounds);
+    void buildTitleImage(juce::Graphics& g);
 };
 
 //MARK: - Goniometer
@@ -292,11 +302,14 @@ struct Goniometer : juce::Component
     void paint(juce::Graphics& g) override;
     void resized() override;
     void setScale(float newScale) { scale = newScale; }
+    void update();
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
+    juce::Rectangle<int> areaToRepaint;
     juce::Path p;
+    std::vector<float> opacities;
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
@@ -311,19 +324,27 @@ struct CorrelationMeter : juce::Component
 {
     CorrelationMeter(juce::AudioBuffer<float>& buffer, double sampleRate);
     void paint(juce::Graphics& g) override;
+    void resized() override;
     void update();
 private:
     juce::AudioBuffer<float>& buffer;
-    
     std::array<juce::dsp::FIR::Filter<float>, 3> filters;
-
     Averager<float> slowAverager{1024*4, 0},
                     peakAverager{512, 0};
+    
+    juce::Rectangle<int> meterArea,
+                         peakMeterArea,
+                         slowMeterArea;
+    const float slowMeterHeightPercentage = { 0.75f };
+    
+    juce::Image labelsImage;
+    juce::Rectangle<int> labelsImageArea;
     
     void drawAverage(juce::Graphics& g,
                      juce::Rectangle<int> bounds,
                      float average,
                      bool drawBorder);
+    void buildLabelsImage(juce::Graphics& g);
 };
 
 //MARK: - StereoImageMeter
@@ -342,6 +363,27 @@ private:
     CorrelationMeter correlationMeter;
 };
 
+//MARK: - UpdateThread
+class UpdateThread : public juce::Thread
+{
+public:
+    UpdateThread() : juce::Thread("PFM10 Update Thread") {}
+    ~UpdateThread() override { stopThread(2000); }
+    void run() override
+    {
+        wait(20); //wait a few ms before running updates
+        
+        for (;;)
+        {
+            if (threadShouldExit()) break;
+            fn();
+            wait(-1); //wait until notified 
+        }
+    }
+    
+    std::function<void()> fn;
+};
+
 //==============================================================================
 //MARK: - PFM10AudioProcessorEditor
 
@@ -357,6 +399,8 @@ public:
     //==============================================================================
     void timerCallback() override;
     int getRefreshRateHz() const;
+    //==============================================================================
+    void update();
     
 private:
     // This reference is provided as a quick way for your editor to
@@ -370,6 +414,12 @@ private:
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
+    
+    UpdateThread updateThread;
+    
+    std::atomic<float> dbLeftChannel,
+                       dbRightChannel,
+                       dbPeakMono;
     
     //==============================================================================
     // Menus
