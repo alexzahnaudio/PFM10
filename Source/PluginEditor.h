@@ -270,7 +270,6 @@ struct Histogram : juce::Component, juce::ValueTree::Listener
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseMove(const juce::MouseEvent& e) override;
-    void mouseEnter(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
     void update(float value);
 private:
@@ -279,11 +278,13 @@ private:
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     
     ReadAllAfterWriteCircularBuffer<float> buffer {float(NEGATIVE_INFINITY)};
+    juce::Rectangle<int> pathArea;
+    int pathAreaTopBottomTrim { 10 };
     juce::Path path;
     float dbThreshold { 0 };
     juce::ColourGradient histogramColourGradient;
-    juce::Colour belowThresholdColour { juce::Colours::orange.withAlpha(0.5f) };
-    juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.5f) };
+    juce::Colour belowThresholdColour { juce::Colours::orange.withAlpha(0.9f) };
+    juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.9f) };
     
     const juce::String title;
     juce::Image titleImage;
@@ -292,6 +293,9 @@ private:
     const int titleHeight { 16 };
     
     DbScale dbScale;
+    int dbScaleWidth { 30 };
+    int dbScaleDivision { 6 };
+    std::vector<int> dbScaleTicksY;
     
     juce::Point<int> mousePos;
     bool isMouseHovered { false };

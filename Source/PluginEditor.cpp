@@ -826,49 +826,73 @@ void Histogram::paint(juce::Graphics &g)
 {
     TRACE_COMPONENT();
     
-    juce::Rectangle<float> localBounds = getLocalBounds().toFloat();
-    g.fillAll(juce::Colours::black);
+    g.setColour(juce::Colours::black);
+    g.fillRect(pathArea);
+    
+    g.setColour(juce::Colours::darkgrey.darker().darker());
+    for (int tickY : dbScaleTicksY)
+    {
+        g.fillRect(pathArea.getX(), tickY, pathArea.getWidth(), 1);
+    }
+
+    displayPath(g, pathArea.toFloat());
+    
+    g.drawImageAt(titleImage, titleImagePosition.x, titleImagePosition.y);
     
     if (isMouseHovered)
     {
+        // Horizontal line at mouse cursor
         g.setColour(juce::Colours::grey);
-        g.fillRect(0, mousePos.getY(), static_cast<int>(localBounds.getWidth()), 1);
+        g.fillRect(pathArea.getX(), mousePos.getY(), pathArea.getWidth(), 1);
 
-        dbValueTextArea.setX(mousePos.getX() < dbScale.getWidth() + dbValueTextAreaWidth ? dbScale.getWidth() - 4 : mousePos.getX() - dbValueTextAreaWidth - 4);
-        dbValueTextArea.setY(mousePos.getY() < dbValueTextAreaHeight ? mousePos.getY() : mousePos.getY() - dbValueTextAreaHeight);
+        // dB value text at mouse cursor - reposition if mouse is too close to the border
+        dbValueTextArea.setX(mousePos.getX() < dbScale.getWidth() + dbValueTextAreaWidth ?
+                             dbScale.getWidth() - 4 : mousePos.getX() - dbValueTextAreaWidth - 4);
+        dbValueTextArea.setY(mousePos.getY() < dbValueTextAreaHeight + pathAreaTopBottomTrim?
+                             mousePos.getY() : mousePos.getY() - dbValueTextAreaHeight);
         
+        g.setColour(juce::Colours::white);
         g.drawText(dbValueHovered, dbValueTextArea, juce::Justification::centredRight);
     }
-
-    displayPath(g, localBounds);
-    
-    g.drawImageAt(titleImage, titleImagePosition.x, titleImagePosition.y);
 }
 
 void Histogram::resized()
 {
-    // use component width for buffer size
-    buffer.resize(static_cast<size_t>(getWidth()), NEGATIVE_INFINITY);
-    
-    int dbScaleWidth = 30;
-    int dbDivision = 6;
     auto bounds = getLocalBounds();
+    
     juce::Rectangle<int> dbScaleArea = juce::Rectangle<int>(bounds.getX(),
                                                             bounds.getY(),
                                                             dbScaleWidth,
                                                             bounds.getHeight());
-    
     dbScale.setBounds(dbScaleArea);
-    dbScale.buildBackgroundImage(dbDivision,
-                                 dbScaleArea,
+    dbScale.buildBackgroundImage(dbScaleDivision,
+                                 dbScaleArea.withTrimmedTop(pathAreaTopBottomTrim).withTrimmedBottom(pathAreaTopBottomTrim),
                                  NEGATIVE_INFINITY,
                                  MAX_DECIBELS);
+    
+    std::vector<Tick> ticks = dbScale.getTicks(dbScaleDivision,
+                                               dbScaleArea.withTrimmedTop(pathAreaTopBottomTrim).withTrimmedBottom(pathAreaTopBottomTrim),
+                                               NEGATIVE_INFINITY,
+                                               MAX_DECIBELS);
+    dbScaleTicksY.clear();
+    for (Tick tick : ticks)
+    {
+        dbScaleTicksY.push_back(tick.y);
+    }
+    
+    pathArea = bounds
+        .withTrimmedLeft(dbScaleWidth)
+        .withTrimmedRight(pathAreaTopBottomTrim)
+        .withTrimmedTop(pathAreaTopBottomTrim)
+        .withTrimmedBottom(pathAreaTopBottomTrim);
+    
+    buffer.resize(static_cast<size_t>(pathArea.getWidth()), NEGATIVE_INFINITY);
     
     titleImage = juce::Image(juce::Image::ARGB, titleWidth, titleHeight, true);
     juce::Graphics g(titleImage);
     buildTitleImage(g);
     
-    titleImagePosition.setXY( getLocalBounds().getCentreX() - titleWidth/2, getLocalBounds().getBottom() - titleHeight );
+    titleImagePosition.setXY( pathArea.getCentreX() - titleWidth/2, pathArea.getBottom() - titleHeight );
 }
 
 void Histogram::buildTitleImage(juce::Graphics &g)
@@ -891,20 +915,24 @@ void Histogram::mouseMove(const juce::MouseEvent &e)
 {
     mousePos = e.getPosition();
     
-    float db = dbScale.yToDb(mousePos.getY(),
-                             getLocalBounds().getHeight(),
-                             NEGATIVE_INFINITY,
-                             MAX_DECIBELS);
-    
-    // Trim to one decimal place, round appropriately
-    dbValueHovered = juce::String( (static_cast<int>((db * 10) + 0.5f) * 0.1f), 1 );
-    
-    repaint();
-}
-
-void Histogram::mouseEnter(__attribute__((unused)) const juce::MouseEvent &e)
-{
-    isMouseHovered = true;
+    if (pathArea.contains(mousePos))
+    {
+        isMouseHovered = true;
+        
+        float db = dbScale.yToDb(mousePos.getY() - pathAreaTopBottomTrim,
+                                 pathArea.getHeight(),
+                                 NEGATIVE_INFINITY,
+                                 MAX_DECIBELS);
+        
+        // Trim to one decimal place, round appropriately
+        dbValueHovered = juce::String( (static_cast<int>((db * 10) + 0.5f) * 0.1f), 1 );
+        
+        repaint();
+    }
+    else
+    {
+        isMouseHovered = false;
+    }
 }
 
 void Histogram::mouseExit(__attribute__((unused)) const juce::MouseEvent &e)
@@ -935,12 +963,12 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
         
         float dbThresholdMapped = juce::jmap(dbThreshold,
                                              NEGATIVE_INFINITY, MAX_DECIBELS,
-                                             0.f, 1.f);
+                                             0.0f, 1.0f);
     
         histogramColourGradient.clearColours();
         histogramColourGradient.addColour(0, belowThresholdColour);
         histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
-        histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.f), aboveThresholdColour);
+        histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.0f), aboveThresholdColour);
         histogramColourGradient.addColour(1, aboveThresholdColour);
         
         g.setGradientFill(histogramColourGradient);
@@ -958,11 +986,14 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
     size_t readIndexCached = buffer.getReadIndex();
     std::vector<float>& dataCached = buffer.getData();
     float bottom = bounds.getBottom();
+    float top = bounds.getY();
+    float left = bounds.getX();
     
     auto map = [=](float db)
     {
-        float result = juce::jmap(db, NEGATIVE_INFINITY, MAX_DECIBELS, bottom, 0.f);
-        return result;
+        return juce::jmap(juce::jlimit(NEGATIVE_INFINITY, MAX_DECIBELS, db),
+                          NEGATIVE_INFINITY, MAX_DECIBELS,
+                          bottom, top);
     };
     
     auto incrementAndWrap = [=](std::size_t readIndex)
@@ -970,12 +1001,12 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
         return (readIndex == bufferSizeCached - 1) ? 0 : readIndex + 1;
     };
             
-    p.startNewSubPath(0, map(dataCached[readIndexCached]));
+    p.startNewSubPath(left + 1, map(dataCached[readIndexCached]));
     readIndexCached = incrementAndWrap(readIndexCached);
         
     for (size_t x = 1; x < bufferSizeCached - 1; ++x)
     {
-        p.lineTo(x, map(dataCached[readIndexCached]));
+        p.lineTo(left + 1 + x, map(dataCached[readIndexCached]));
         readIndexCached = incrementAndWrap(readIndexCached);
     }
     
@@ -986,8 +1017,8 @@ juce::Path Histogram::buildPath(juce::Path &p, ReadAllAfterWriteCircularBuffer<f
     else
     {
         juce::Path fillPath(p);
-        fillPath.lineTo(bounds.getBottomRight());
-        fillPath.lineTo(bounds.getBottomLeft());
+        fillPath.lineTo(bounds.getBottomRight().translated(-1, 0));
+        fillPath.lineTo(bounds.getBottomLeft().translated(1, 0));
         fillPath.closeSubPath();
         return fillPath;
     }
