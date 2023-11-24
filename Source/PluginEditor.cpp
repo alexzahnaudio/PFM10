@@ -611,9 +611,9 @@ void DbScale::buildBackgroundImage(int dbDivision,
         bkgdGraphicsContext.drawFittedText(tickString,
                                            0,                       //x
                                            tick.y - 1,              //y
-                                           30,                      //width
+                                           27,                      //width
                                            1,                       //height
-                                           juce::Justification::centred,
+                                           juce::Justification::centredRight,
                                            1);                      //max num lines
     }
 }
