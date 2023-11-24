@@ -316,6 +316,7 @@ struct Goniometer : juce::Component
     void resized() override;
     void setScale(float newScale) { scale = newScale; }
     void update();
+    float getDiameter() const { return diameter; }
 private:
     juce::AudioBuffer<float>& buffer;
     juce::AudioBuffer<float> internalBuffer;
@@ -339,6 +340,9 @@ struct CorrelationMeter : juce::Component
     void paint(juce::Graphics& g) override;
     void resized() override;
     void update();
+    
+    int getMeterAreaTrimBottom() const { return meterAreaTrimBottom; }
+    int getMeterAreaTrimSide() const { return meterAreaTrimSide; }
 private:
     juce::AudioBuffer<float>& buffer;
     std::array<juce::dsp::FIR::Filter<float>, 3> filters;
@@ -348,7 +352,9 @@ private:
     juce::Rectangle<int> meterArea,
                          peakMeterArea,
                          slowMeterArea;
-    const float slowMeterHeightPercentage = { 0.75f };
+    const float slowMeterHeightPercentage { 0.75f };
+    const int meterAreaTrimBottom { 20 };
+    const int meterAreaTrimSide { 10 };
     
     juce::Image labelsImage;
     juce::Rectangle<int> labelsImageArea;
@@ -489,8 +495,8 @@ private:
     
     //==============================================================================
     
-    int pluginWidth { 700 };
-    int pluginHeight { 600 };
+    int pluginWidth { 720 };
+    int pluginHeight { 620 };
 
     int refreshRateHz { 60 };
     

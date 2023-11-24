@@ -1048,6 +1048,17 @@ void Goniometer::buildBackground(juce::Graphics &g)
     int radiusInt = static_cast<int>(radius);
     int radiusDotOrthoInt = static_cast<int>(radiusDotOrtho);
     int axisLabelSize = 30;
+    
+    int gradientFillBorderWidth = 15;
+    g.setGradientFill(juce::ColourGradient(juce::Colours::darkgrey.brighter(),
+                                           juce::Point<float>(centerX, centerY - radius - gradientFillBorderWidth),
+                                           juce::Colours::darkgrey.darker(),
+                                           juce::Point<float>(centerX, centerY + radius + gradientFillBorderWidth),
+                                           false));
+    g.fillEllipse(centerX - radius - gradientFillBorderWidth,
+                  centerY - radius - gradientFillBorderWidth,
+                  diameter + gradientFillBorderWidth + gradientFillBorderWidth,
+                  diameter + gradientFillBorderWidth + gradientFillBorderWidth);
 
     // circle
     g.setColour(juce::Colours::black);
@@ -1298,9 +1309,9 @@ void CorrelationMeter::resized()
     juce::Rectangle<int> localBounds = getLocalBounds();
     
     meterArea = localBounds
-                .withTrimmedBottom(20)
-                .withTrimmedLeft(10)
-                .withTrimmedRight(10);
+                .withTrimmedBottom(meterAreaTrimBottom)
+                .withTrimmedLeft(meterAreaTrimSide)
+                .withTrimmedRight(meterAreaTrimSide);
     
     int meterAreaHeight = meterArea.getHeight();
     
@@ -1436,11 +1447,14 @@ void StereoImageMeter::resized()
                                  0.0f,
                                  0.698f,
                                  gonioToCorrMeterHeightRatio);
+    goniometer.setBounds(goniometer.getBounds().withTrimmedBottom(10));
             
-    correlationMeter.setBoundsRelative(0.0f,
+    correlationMeter.setBoundsRelative(0.181f,
                                        gonioToCorrMeterHeightRatio,
-                                       1.0f,
+                                       0.698f,
                                        1.0f - gonioToCorrMeterHeightRatio);
+    int sideTrim = correlationMeter.getMeterAreaTrimSide();
+    correlationMeter.setBounds(correlationMeter.getBounds().withTrimmedLeft(sideTrim).withTrimmedRight(sideTrim));
 }
 
 void StereoImageMeter::update()
@@ -1690,28 +1704,27 @@ void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
 {
     TRACE_COMPONENT();
     
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    g.fillAll(juce::Colours::darkgrey.darker());
+    
+    g.setColour(juce::Colours::darkgrey);
+    g.fillRoundedRectangle(getLocalBounds().reduced(5).toFloat(), 5.0f);
 }
 
 void PFM10AudioProcessorEditor::resized()
 {
-    auto bounds = getLocalBounds();
+    auto bounds = getLocalBounds().reduced(10);
     auto width = bounds.getWidth();
     auto height = bounds.getHeight();
 
-    peakStereoMeter.setTopLeftPosition(0, 0);
+    peakStereoMeter.setTopLeftPosition(bounds.getX(), bounds.getY());
     peakStereoMeter.setSize(120, height * 2/3);
-
-    peakHistogram.setBounds(0,
-                            peakStereoMeter.getBottom(),
-                            width,
-                            height - peakStereoMeter.getBottom());
     
     stereoImageMeter.setBounds(peakStereoMeter.getRight(),
-                               0,
+                               bounds.getY(),
                                width - peakStereoMeter.getRight(),
-                               height - peakHistogram.getHeight());
+                               peakStereoMeter.getHeight());
+    
+    peakHistogram.setBounds(bounds.withTop(peakStereoMeter.getBottom()));
     
     // Menus
     int menuWidth = 100;
@@ -1721,7 +1734,7 @@ void PFM10AudioProcessorEditor::resized()
     int goniometerScaleRotarySliderSize = 100;
     
     decayRateMenuLabel.setBounds(menuX,
-                                 0,
+                                 bounds.getY(),
                                  menuWidth,
                                  menuHeight);
     decayRateMenu.setBounds(menuX,
