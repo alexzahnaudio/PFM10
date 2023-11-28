@@ -907,7 +907,7 @@ void Histogram::mouseDown(__attribute__((unused)) const juce::MouseEvent &e)
     buffer.clear(NEGATIVE_INFINITY);
     
     TRACE_EVENT_BEGIN("component", "HistogramRepaint");
-    repaint();
+    repaint(pathArea);
     TRACE_EVENT_END("component");
 }
 
@@ -947,7 +947,7 @@ void Histogram::update(float value)
     buffer.write(value);
     
     TRACE_EVENT_BEGIN("component", "HistogramRepaint");
-    juce::MessageManager::getInstance()->callAsync( [this] { repaint(); } );
+    juce::MessageManager::getInstance()->callAsync( [this] { repaint(pathArea); } );
     TRACE_EVENT_END("component");}
 
 void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
