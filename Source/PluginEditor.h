@@ -440,9 +440,9 @@ private:
     
     UpdateThread updateThread;
     
-    std::atomic<float> dbLeftChannel,
-                       dbRightChannel,
-                       dbPeakMono;
+    std::atomic<float> dbLeftChannel  { NEGATIVE_INFINITY };
+    std::atomic<float> dbRightChannel { NEGATIVE_INFINITY };
+    std::atomic<float> dbPeakMono     { NEGATIVE_INFINITY };
     
     //==============================================================================
     // Menus
