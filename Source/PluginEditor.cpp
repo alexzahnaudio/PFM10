@@ -1080,6 +1080,8 @@ void Goniometer::buildBackground(juce::Graphics &g)
     int radiusDotOrthoInt = static_cast<int>(radiusDotOrtho);
     int axisLabelSize = 30;
     
+    /*
+    // gradient border for depth
     int gradientFillBorderWidth = 15;
     g.setGradientFill(juce::ColourGradient(juce::Colours::darkgrey.brighter(),
                                            juce::Point<float>(centerX, centerY - radius - gradientFillBorderWidth),
@@ -1090,6 +1092,7 @@ void Goniometer::buildBackground(juce::Graphics &g)
                   centerY - radius - gradientFillBorderWidth,
                   diameter + gradientFillBorderWidth + gradientFillBorderWidth,
                   diameter + gradientFillBorderWidth + gradientFillBorderWidth);
+    */
 
     // circle
     g.setColour(juce::Colours::black);
@@ -1511,6 +1514,7 @@ PFM10AudioProcessorEditor::PFM10AudioProcessorEditor (PFM10AudioProcessor& p)
       audioProcessor (p),
       valueTree(p.valueTree),
       editorAudioBuffer(2, 512),
+      background(juce::ImageFileFormat::loadFrom(BinaryData::plugin_bg_half_png, BinaryData::plugin_bg_half_pngSize)),
       peakStereoMeter(valueTree, juce::String("Peak")),
       peakHistogram(valueTree, juce::String("Peak")),
       stereoImageMeter(valueTree, editorAudioBuffer, audioProcessor.getSampleRate())
@@ -1742,6 +1746,8 @@ void PFM10AudioProcessorEditor::paint (juce::Graphics& g)
     
     g.setColour(juce::Colours::darkgrey);
     g.fillRoundedRectangle(getLocalBounds().reduced(5).toFloat(), 5.0f);
+    
+    g.drawImageAt(background, 0, 0);
 }
 
 void PFM10AudioProcessorEditor::resized()

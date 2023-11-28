@@ -20,6 +20,8 @@
       <FILE id="HWAkkO" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
       <FILE id="rQvLJd" name="Identifiers.h" compile="0" resource="0" file="Source/Identifiers.h"/>
     </GROUP>
+    <FILE id="Fn8fvD" name="plugin bg half.png" compile="0" resource="1"
+          file="Images/plugin bg half.png"/>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>

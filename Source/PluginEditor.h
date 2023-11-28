@@ -436,6 +436,8 @@ private:
     
     juce::AudioBuffer<float> editorAudioBuffer;
     
+    juce::Image background;
+    
     StereoMeter peakStereoMeter;
     Histogram peakHistogram;
     StereoImageMeter stereoImageMeter;
