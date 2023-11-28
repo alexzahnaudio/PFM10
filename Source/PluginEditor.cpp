@@ -1194,6 +1194,7 @@ void Goniometer::paint(juce::Graphics &g)
     
     TRACE_EVENT_BEGIN("component", "goniometer stroke path");
     g.setColour(juce::Colours::antiquewhite);
+    std::lock_guard<std::mutex> lock(pathMutex);
     g.strokePath(p, juce::PathStrokeType(2.0f));
     TRACE_EVENT_END("component");
 }
@@ -1212,6 +1213,8 @@ void Goniometer::update()
     juce::Point<float> centerFloat(center.toFloat());
     juce::Point<float> vertex;
     int numSamples = buffer.getNumSamples();
+    
+    std::lock_guard<std::mutex> lock(pathMutex);
     
     p.clear();
     

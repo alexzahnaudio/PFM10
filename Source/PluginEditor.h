@@ -306,8 +306,8 @@ private:
     
     void displayPath(juce::Graphics& g, juce::Rectangle<float> bounds);
     static juce::Path buildPath(juce::Path& p,
-                          ReadAllAfterWriteCircularBuffer<float>& buffer,
-                          juce::Rectangle<float> bounds);
+                                ReadAllAfterWriteCircularBuffer<float>& buffer,
+                                juce::Rectangle<float> bounds);
     void buildTitleImage(juce::Graphics& g);
 };
 
@@ -332,6 +332,8 @@ private:
     float radius, diameter;
     juce::Point<int> center;
     float scale;
+    
+    std::mutex pathMutex;
 
     void buildBackground(juce::Graphics& g);
 };
