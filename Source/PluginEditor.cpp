@@ -1610,6 +1610,7 @@ void PFM10AudioProcessorEditor::initMenus()
     addAndMakeVisible(goniometerScaleRotarySliderLabel);
 
     goniometerScaleRotarySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+    goniometerScaleRotarySlider.setColour(juce::Slider::thumbColourId, juce::Colours::grey.brighter());
     goniometerScaleRotarySlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 20);
     goniometerScaleRotarySlider.textFromValueFunction = [](double value)
     {
