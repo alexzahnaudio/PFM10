@@ -146,15 +146,21 @@ void DecayingValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const j
 
 void DecayingValueHolder::updateHeldValue(float input)
 {
+    std::lock_guard<std::mutex> lock(heldValueMutex);
+    
     if (input > heldValue)
     {
+        peakTimeMutex.lock();
         peakTime = getNow();
+        peakTimeMutex.unlock();
+        
         heldValue = input;
     }
 }
 
 void DecayingValueHolder::resetHeldValue()
 {
+    std::lock_guard<std::mutex> lock(heldValueMutex);
     heldValue = NEGATIVE_INFINITY;
 }
 
@@ -185,10 +191,16 @@ void DecayingValueHolder::timerCallback()
 {
     juce::int64 now = getNow();
     
+    peakTimeMutex.lock();
+    juce::int64 peakTimeCached = peakTime;
+    peakTimeMutex.unlock();
+    
     if (! holdForInf)
     {
-        if ((now - peakTime) > holdTimeMs)
+        if ((now - peakTimeCached) > holdTimeMs)
         {
+            std::lock_guard<std::mutex> lock(heldValueMutex);
+            
             heldValue -= decayRatePerFrame;
             
             heldValue = juce::jlimit(NEGATIVE_INFINITY,
@@ -255,19 +267,21 @@ void ValueHolder::valueTreePropertyChanged(juce::ValueTree& _vt, const juce::Ide
 void ValueHolder::timerCallback()
 {
     juce::int64 now = juce::Time::currentTimeMillis();
+    timeOfPeakMutex.lock();
     juce::int64 elapsed = now - timeOfPeak;
+    timeOfPeakMutex.unlock();
     
     if (! holdForInf && elapsed > durationToHoldForMs)
     {
-        heldValue = currentValue;
-        isOverThreshold = (heldValue > threshold);
+        heldValue = currentValue.load();
+        isOverThreshold = (heldValue > threshold.load());
     }
 }
 
 void ValueHolder::setThreshold(float th)
 {
     threshold = th;
-    isOverThreshold = (heldValue > threshold);
+    isOverThreshold = ( heldValue.load() > th );
 }
 
 void ValueHolder::setHoldEnabled(bool b)
@@ -284,11 +298,14 @@ bool ValueHolder::updateHeldValue(float v)
 {
     currentValue = v;
     
-    if (v >= heldValue)
+    if (v >= heldValue.load())
     {
+        timeOfPeakMutex.lock();
         timeOfPeak = juce::Time::currentTimeMillis();
+        timeOfPeakMutex.unlock();
+        
         heldValue = v;
-        isOverThreshold = (heldValue > threshold);
+        isOverThreshold = (v > threshold.load());
         
         return true;
     }
@@ -321,10 +338,13 @@ void TextMeter::paint(juce::Graphics &g)
     g.fillAll(juce::Colours::black);
     g.setColour ( valueHolder.getIsOverThreshold() ? textColorOverThreshold : textColorDefault );
     g.setFont(12.f);
+    
+    textToDisplayMutex.lock();
     g.drawFittedText(textToDisplay,
                      getLocalBounds(),
                      juce::Justification::centredBottom,
                      1);
+    textToDisplayMutex.unlock();
 }
 
 void TextMeter::update(float valueDb)
@@ -335,11 +355,15 @@ void TextMeter::update(float valueDb)
     {
         if (valueDb > NEGATIVE_INFINITY)
         {
+            textToDisplayMutex.lock();
             textToDisplay = juce::String(valueDb, 1).trimEnd();
+            textToDisplayMutex.unlock();
         }
         else
         {
+            textToDisplayMutex.lock();
             textToDisplay = juce::String("-inf");
+            textToDisplayMutex.unlock();
         }
         
         TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
@@ -362,7 +386,9 @@ void TextMeter::resetHold()
 {
     valueHolder.resetHeldValue();
     
+    textToDisplayMutex.lock();
     textToDisplay = juce::String("-inf");
+    textToDisplayMutex.unlock();
     
     TRACE_EVENT_BEGIN("component", "TextMeterRepaint");
     repaint();
@@ -390,6 +416,8 @@ void Meter::paint(juce::Graphics& g)
     float yMin = meterBounds.getBottom();
     float yMax = meterBounds.getY();
             
+    std::lock_guard<std::mutex> lock(dbPeakMutex);
+
     auto dbPeakMapped = juce::jmap(dbPeak, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
     dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
     
@@ -429,6 +457,8 @@ void Meter::update(float dbLevel)
 {
     TRACE_COMPONENT();
 
+    std::lock_guard<std::mutex> lock(dbPeakMutex);
+    
     dbPeak = dbLevel;
     if (peakHoldEnabled)
     {
@@ -1196,7 +1226,7 @@ void Goniometer::paint(juce::Graphics &g)
     TRACE_EVENT_END("component");
     
     TRACE_EVENT_BEGIN("component", "goniometer stroke path");
-    g.setColour(juce::Colours::antiquewhite);
+    g.setColour(juce::Colours::antiquewhite.withAlpha(0.9f));
     std::lock_guard<std::mutex> lock(pathMutex);
     g.strokePath(p, juce::PathStrokeType(2.0f));
     TRACE_EVENT_END("component");
@@ -1216,19 +1246,20 @@ void Goniometer::update()
     juce::Point<float> centerFloat(center.toFloat());
     juce::Point<float> vertex;
     int numSamples = buffer.getNumSamples();
-    
-    std::lock_guard<std::mutex> lock(pathMutex);
-    
-    p.clear();
+    float scaleCached = scale.load();
     
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
     internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
+    
+    std::lock_guard<std::mutex> lock(pathMutex);
+    p.clear();
     
     for (int i = 0; i < numSamples; ++i)
     {
         leftSample  = internalBuffer.getSample(0, i);
         rightSample = internalBuffer.getSample(1, i);
         
+        // Clean out any NaN or Inf values
         if (std::isnan(leftSample) || std::isinf(leftSample))
         {
             leftSample = 0.0f;
@@ -1240,8 +1271,13 @@ void Goniometer::update()
             DBG("Invalid sample detected in buffer.");
         }
         
-        leftSample  *= scale;
-        rightSample *= scale;
+        // Limit any obscenely large samples to a range that won't cause overflow
+        leftSample  = juce::jlimit(-2.0f, 2.0f, leftSample);
+        rightSample = juce::jlimit(-2.0f, 2.0f, rightSample);
+        
+        // Apply goniometer scale
+        leftSample  *= scaleCached;
+        rightSample *= scaleCached;
         
         jassert( ! std::isnan(leftSample) && ! std::isinf(leftSample) );
         jassert( ! std::isnan(rightSample) && ! std::isinf(rightSample) );
@@ -1253,6 +1289,7 @@ void Goniometer::update()
         jassert( ! std::isnan(mid) && ! std::isinf(mid) );
         jassert( ! std::isnan(side) && ! std::isinf(side) );
         
+        // 0 dBfs (1.0f) samples should reach the edge of the circle
         midMapped = juce::jmap(mid,
                                -1.f,
                                1.f,
@@ -1273,15 +1310,12 @@ void Goniometer::update()
         if (vertex.getDistanceSquaredFromOrigin() > radiusSquared)
         {
             vertex *= radius / vertex.getDistanceFromOrigin();
-            vertex += centerFloat;
             
             jassert( ! std::isnan(vertex.x) && ! std::isinf(vertex.x) );
             jassert( ! std::isnan(vertex.y) && ! std::isinf(vertex.y) );
         }
-        else
-        {
-            vertex += centerFloat;
-        }
+
+        vertex += centerFloat;
         
         if (i == 0)
         {
@@ -1822,10 +1856,14 @@ void PFM10AudioProcessorEditor::timerCallback()
     
     if(audioProcessor.audioBufferFifo.getNumAvailableForReading() > 0)
     {
+        bufferMutex.lock();
+        
         // Pull every element out of the audio buffer FIFO into the editor audio buffer
         while( audioProcessor.audioBufferFifo.pull(editorAudioBuffer) )
         {
         }
+        
+        bufferMutex.unlock();
         
         // Get the left channel's peak magnitude within the editor audio buffer
         float magLeftChannel = editorAudioBuffer.getMagnitude(0, 0, editorAudioBuffer.getNumSamples());
@@ -1855,5 +1893,7 @@ void PFM10AudioProcessorEditor::update()
     
     peakHistogram.update( dbPeakMono.load() );
     
+    bufferMutex.lock();
     stereoImageMeter.update();
+    bufferMutex.unlock();
 }

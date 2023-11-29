@@ -101,6 +101,9 @@ private:
     float threshold { NEGATIVE_INFINITY };
     float decayRatePerFrame;
     static juce::int64 getNow();
+    
+    std::mutex heldValueMutex;
+    std::mutex peakTimeMutex;
 };
 
 //MARK: - ValueHolder
@@ -115,9 +118,9 @@ struct ValueHolder : juce::Timer, juce::ValueTree::Listener
     void setHoldDuration(int ms) { durationToHoldForMs = ms; }
     void setHoldEnabled(bool b);
     void setHoldForInf(bool b) { holdForInf = b; }
-    float getCurrentValue() const { return currentValue; }
-    float getHeldValue() const { return heldValue; }
-    bool getIsOverThreshold() const { return isOverThreshold; }
+    float getCurrentValue() const { return currentValue.load(); }
+    float getHeldValue() const { return heldValue.load(); }
+    bool getIsOverThreshold() const { return isOverThreshold.load(); }
     void timerCallback() override;
 private:
     // Value Tree
@@ -127,11 +130,13 @@ private:
     bool holdEnabled;
     bool holdForInf;
     int durationToHoldForMs;
-    float threshold { NEGATIVE_INFINITY };
-    float currentValue { NEGATIVE_INFINITY };
-    float heldValue { NEGATIVE_INFINITY };
+    std::atomic<float> threshold { NEGATIVE_INFINITY };
+    std::atomic<float> currentValue { NEGATIVE_INFINITY };
+    std::atomic<float> heldValue { NEGATIVE_INFINITY };
     juce::int64 timeOfPeak;
-    bool isOverThreshold { false };
+    std::atomic<bool> isOverThreshold { false };
+    
+    std::mutex timeOfPeakMutex;
 };
 
 //MARK: - TextMeter
@@ -149,6 +154,8 @@ private:
     juce::Colour textColorDefault { juce::Colours::white };
     juce::Colour textColorOverThreshold { juce::Colours::red };
     juce::String textToDisplay { "-inf" };
+    
+    std::mutex textToDisplayMutex;
 };
 
 //MARK: - Meter
@@ -166,6 +173,8 @@ private:
     float dbPeak { NEGATIVE_INFINITY };
     float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
+    
+    std::mutex dbPeakMutex;
 };
 
 //MARK: - MacroMeter
@@ -331,7 +340,7 @@ private:
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
-    float scale;
+    std::atomic<float> scale;
     
     std::mutex pathMutex;
 
@@ -447,6 +456,8 @@ private:
     std::atomic<float> dbLeftChannel  { NEGATIVE_INFINITY };
     std::atomic<float> dbRightChannel { NEGATIVE_INFINITY };
     std::atomic<float> dbPeakMono     { NEGATIVE_INFINITY };
+    
+    std::mutex bufferMutex;
     
     //==============================================================================
     // Menus
