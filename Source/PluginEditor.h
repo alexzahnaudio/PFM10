@@ -174,6 +174,11 @@ private:
     float dbThreshold { 0 };
     DecayingValueHolder decayingValueHolder;
     
+    juce::ColourGradient meterColourGradient;
+    juce::Colour bottomColour         { juce::Colours::green.withAlpha(0.9f) };
+    juce::Colour belowThresholdColour { juce::Colours::gold.withAlpha(0.9f) };
+    juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.9f) };
+    
     std::mutex dbPeakMutex;
 };
 
@@ -292,7 +297,8 @@ private:
     juce::Path path;
     float dbThreshold { 0 };
     juce::ColourGradient histogramColourGradient;
-    juce::Colour belowThresholdColour { juce::Colours::orange.withAlpha(0.9f) };
+    juce::Colour bottomColour         { juce::Colours::green.withAlpha(0.9f) };
+    juce::Colour belowThresholdColour { juce::Colours::gold.withAlpha(0.9f) };
     juce::Colour aboveThresholdColour { juce::Colours::red.withAlpha(0.9f) };
     
     const juce::String title;
@@ -370,6 +376,11 @@ private:
     const float slowMeterHeightPercentage { 0.75f };
     const int meterAreaTrimBottom { 20 };
     const int meterAreaTrimSide { 10 };
+    
+    juce::ColourGradient meterColorGradient;
+    juce::Colour meterColorLeft   { juce::Colours::red };
+    juce::Colour meterColorCenter { juce::Colours::gold };
+    juce::Colour meterColorRight  { juce::Colours::green };
     
     juce::Image labelsImage;
     juce::Rectangle<int> labelsImageArea;

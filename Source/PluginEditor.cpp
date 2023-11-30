@@ -403,6 +403,11 @@ Meter::Meter(juce::ValueTree _vt)
 {
     setPeakHoldEnabled(_vt.getProperty(IDs::peakHoldEnabled));
     
+    meterColourGradient.addColour(0.0, bottomColour);
+    meterColourGradient.addColour(1.0, belowThresholdColour);
+    meterColourGradient.point1.setX(0.0f);
+    meterColourGradient.point2.setX(0.0f);
+    
     setOpaque(true);
 }
 
@@ -415,6 +420,9 @@ void Meter::paint(juce::Graphics& g)
     juce::Rectangle<float> meterBounds = getLocalBounds().toFloat();
     float yMin = meterBounds.getBottom();
     float yMax = meterBounds.getY();
+    
+    auto dbThresholdCached = dbThreshold;
+    auto yThreshold = juce::jmap(dbThresholdCached, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
             
     std::lock_guard<std::mutex> lock(dbPeakMutex);
 
@@ -422,17 +430,18 @@ void Meter::paint(juce::Graphics& g)
     dbPeakMapped = juce::jmax(dbPeakMapped, yMax);
     
     juce::Rectangle<float> meterFillRect = meterBounds.withY(dbPeakMapped);
-    g.setColour(juce::Colours::orange);
-    g.fillRect(meterFillRect);
+        
+    // Gradient fill below threshold value
+    meterColourGradient.point1.setY(yMin);
+    meterColourGradient.point2.setY(yThreshold);
+    g.setGradientFill(meterColourGradient);
+    g.fillRect(meterFillRect.withTop(dbPeakMapped));
     
     // Red rectangle fill for peaks above threshold value
-    if (dbPeak > dbThreshold)
+    if (dbPeak > dbThresholdCached)
     {
-        auto yThreshold = juce::jmap(dbThreshold, NEGATIVE_INFINITY, MAX_DECIBELS, yMin, yMax);
-                
-        juce::Rectangle<float> thresholdFillRect = meterFillRect.withBottom(yThreshold);
-        g.setColour(juce::Colours::red);
-        g.fillRect(thresholdFillRect);
+        g.setColour(aboveThresholdColour);
+        g.fillRect(meterFillRect.withBottom(yThreshold));
     }
     
     // Decaying Peak Level Tick Mark
@@ -916,6 +925,9 @@ void Histogram::resized()
         .withTrimmedTop(pathAreaTopBottomTrim)
         .withTrimmedBottom(pathAreaTopBottomTrim);
     
+    histogramColourGradient.point1 = pathArea.getBottomLeft().toFloat();
+    histogramColourGradient.point2 = pathArea.getTopLeft().toFloat();
+    
     buffer.resize(static_cast<size_t>(pathArea.getWidth()), NEGATIVE_INFINITY);
     
     titleImage = juce::Image(juce::Image::ARGB, titleWidth, titleHeight, true);
@@ -987,16 +999,13 @@ void Histogram::displayPath(juce::Graphics &g, juce::Rectangle<float> bounds)
     juce::Path fillPath = buildPath(path, buffer, bounds);
     
     if (!fillPath.isEmpty())
-    {       
-        histogramColourGradient.point1.setXY(bounds.getX(), bounds.getBottom());
-        histogramColourGradient.point2.setXY(bounds.getX(), bounds.getY());
-        
+    {
         float dbThresholdMapped = juce::jmap(dbThreshold,
                                              NEGATIVE_INFINITY, MAX_DECIBELS,
                                              0.0f, 1.0f);
     
         histogramColourGradient.clearColours();
-        histogramColourGradient.addColour(0, belowThresholdColour);
+        histogramColourGradient.addColour(0, bottomColour);
         histogramColourGradient.addColour(dbThresholdMapped, belowThresholdColour);
         histogramColourGradient.addColour(juce::jmin(dbThresholdMapped + 0.01f, 1.0f), aboveThresholdColour);
         histogramColourGradient.addColour(1, aboveThresholdColour);
@@ -1395,6 +1404,13 @@ void CorrelationMeter::resized()
     labelsImage = juce::Image(juce::Image::ARGB, labelsImageArea.getWidth(), labelsImageArea.getHeight(), true);
     juce::Graphics g(labelsImage);
     buildLabelsImage(g);
+    
+    meterColorGradient.clearColours();
+    meterColorGradient.addColour(0.0, meterColorLeft);
+    meterColorGradient.addColour(0.5, meterColorCenter);
+    meterColorGradient.addColour(1.0, meterColorRight);
+    meterColorGradient.point1 = meterArea.getTopLeft().toFloat();
+    meterColorGradient.point2 = meterArea.getTopRight().toFloat();
 }
 
 void CorrelationMeter::buildLabelsImage(juce::Graphics &g)
@@ -1462,7 +1478,7 @@ void CorrelationMeter::drawAverage(juce::Graphics& g,
                                                     0.f,
                                                     width / 2.f));
     
-    g.setColour(juce::Colours::orange);
+    g.setGradientFill(meterColorGradient);
     if (average < 0)
     {
         g.fillRect(centerX - averageMapped,
