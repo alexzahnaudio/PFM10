@@ -1074,17 +1074,6 @@ Goniometer::Goniometer(juce::AudioBuffer<float>& _buffer)
     
     internalBuffer.setSize(numChannels, numSamples);
     internalBuffer.clear();
-    
-    opacities.resize( static_cast<size_t>(numSamples), 0 );
-    
-    for (size_t i = 0; i < static_cast<size_t>(numSamples); ++i)
-    {
-        opacities[i] = juce::jmap(static_cast<float>(i),
-                                  0.0f,
-                                  static_cast<float>(numSamples - 1),
-                                  0.5f,
-                                  1.0f);
-    }
 }
 
 void Goniometer::resized()
@@ -1107,6 +1096,8 @@ void Goniometer::resized()
                                          .withTrimmedRight(  amountToTrimLeftRight )
                                          .withTrimmedTop(    amountToTrimTopBottom )
                                          .withTrimmedBottom( amountToTrimTopBottom ));
+    
+    pointCloud = juce::Image(juce::Image::ARGB, w, h, true);
 }
 
 void Goniometer::buildBackground(juce::Graphics &g)
@@ -1234,10 +1225,10 @@ void Goniometer::paint(juce::Graphics &g)
     g.drawImageAt(backgroundImage, 0, 0);
     TRACE_EVENT_END("component");
     
-    TRACE_EVENT_BEGIN("component", "goniometer stroke path");
-    g.setColour(juce::Colours::antiquewhite.withAlpha(0.9f));
-    std::lock_guard<std::mutex> lock(pathMutex);
-    g.strokePath(p, juce::PathStrokeType(2.0f));
+    std::lock_guard<std::mutex> lock(pointCloudMutex);
+    
+    TRACE_EVENT_BEGIN("component", "goniometer draw cloud");
+    g.drawImageAt(pointCloud, 0, 0);
     TRACE_EVENT_END("component");
 }
 
@@ -1260,8 +1251,9 @@ void Goniometer::update()
     internalBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
     internalBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
     
-    std::lock_guard<std::mutex> lock(pathMutex);
-    p.clear();
+    std::lock_guard<std::mutex> lock(pointCloudMutex);
+    
+    pointCloud.multiplyAllAlphas(0.99f);
     
     for (int i = 0; i < numSamples; ++i)
     {
@@ -1322,17 +1314,20 @@ void Goniometer::update()
             
             jassert( ! std::isnan(vertex.x) && ! std::isinf(vertex.x) );
             jassert( ! std::isnan(vertex.y) && ! std::isinf(vertex.y) );
-        }
-
-        vertex += centerFloat;
-        
-        if (i == 0)
-        {
-            p.startNewSubPath(vertex);
+            
+            vertex += centerFloat;
+            
+            pointCloud.setPixelAt(static_cast<int>(vertex.x),
+                                  static_cast<int>(vertex.y),
+                                  juce::Colours::red);
         }
         else
         {
-            p.lineTo(vertex);
+            vertex += centerFloat;
+            
+            pointCloud.setPixelAt(static_cast<int>(vertex.x),
+                                  static_cast<int>(vertex.y),
+                                  juce::Colours::white);
         }
     }
     TRACE_EVENT_END("component");

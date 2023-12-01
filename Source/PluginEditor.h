@@ -341,14 +341,13 @@ private:
     juce::AudioBuffer<float> internalBuffer;
     juce::Image backgroundImage;
     juce::Rectangle<int> areaToRepaint;
-    juce::Path p;
-    std::vector<float> opacities;
+    juce::Image pointCloud;
     int w, h;
     float radius, diameter;
     juce::Point<int> center;
     std::atomic<float> scale;
     
-    std::mutex pathMutex;
+    std::mutex pointCloudMutex;
 
     void buildBackground(juce::Graphics& g);
 };
